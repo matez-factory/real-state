@@ -1,0 +1,33 @@
+{
+  "name": "real-estate-lots-navigator",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "db:seed": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/supabase/seed-aurora.ts",
+    "db:upload-media": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/supabase/upload-aurora-media.ts",
+    "db:upload-svgs": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/supabase/upload-aurora-svgs.ts"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.95.3",
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "dotenv": "^17.3.1",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "tailwindcss": "^4",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}
