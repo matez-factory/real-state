@@ -3,9 +3,27 @@
 // ============================================================
 
 export type EntityStatus = 'available' | 'reserved' | 'sold' | 'not_available';
-export type ProjectType = 'subdivision' | 'building';
-export type MediaType = 'image' | 'video';
-export type MediaPurpose = 'cover' | 'gallery' | 'exploration' | 'transition' | 'thumbnail' | 'floor_plan';
+export type ProjectType = 'lots' | 'building' | 'masterplan';
+export type ProjectStatus = 'draft' | 'active' | 'archived';
+export type ProjectScale = 'small' | 'medium' | 'large';
+export type LayerType = 'neighborhood' | 'block' | 'zone' | 'tower' | 'floor' | 'lot' | 'unit';
+export type MediaType = 'image' | 'video' | 'svg' | 'document';
+export type MediaPurpose =
+  | 'background'
+  | 'background_mobile'
+  | 'thumbnail'
+  | 'gallery'
+  | 'ficha_furnished'
+  | 'ficha_measured'
+  | 'overlay'
+  | 'overlay_mobile'
+  | 'transition'
+  | 'intro'
+  | 'brochure'
+  | 'logo'
+  | 'hotspot'
+  | 'layers_gallery'
+  | 'exterior_360';
 
 // ============================================================
 // Core entities
@@ -17,31 +35,94 @@ export interface Project {
   name: string;
   description?: string;
   type: ProjectType;
-  status: EntityStatus;
+  status: ProjectStatus;
+  scale: ProjectScale;
   layerLabels: string[];
   maxDepth: number;
-  svgPath?: string;
+  svgOverlayUrl?: string;
+
+  // Location
   address?: string;
   city?: string;
   state?: string;
   country?: string;
   coordinates?: { lat: number; lng: number };
-  settings: Record<string, unknown>;
+  googleMapsEmbedUrl?: string;
+
+  // Branding
+  logoUrl?: string;
+  secondaryLogoUrl?: string;
+  tagline?: string;
+
+  // Contact
+  phone?: string;
+  email?: string;
+  whatsapp?: string;
+  website?: string;
+
+  // Feature toggles
+  hasVideoIntro: boolean;
+  hasGallery: boolean;
+  has360Tour: boolean;
+  hasRecorrido360Embed: boolean;
+  recorrido360EmbedUrl?: string;
+  hasDownloads: boolean;
+  hasStateManagement: boolean;
+  hasLayersGallery: boolean;
+  hasZoomIn: boolean;
 }
 
 export interface Layer {
   id: string;
   projectId: string;
   parentId: string | null;
+  type: LayerType;
   depth: number;
   sortOrder: number;
   slug: string;
   name: string;
   label: string;
+  path?: string;
+  parentName?: string;
   svgElementId?: string;
   status: EntityStatus;
-  svgPath?: string;
+
+  // Visual assets
+  svgOverlayUrl?: string;
+  svgOverlayMobileUrl?: string;
+  backgroundImageUrl?: string;
+  backgroundImageMobileUrl?: string;
+
+  // Dimensions
+  area?: number;
+  areaUnit?: string;
+  frontLength?: number;
+  depthLength?: number;
+
+  // Pricing
+  price?: number;
+  currency?: string;
+  pricePerUnit?: number;
+
+  // Characteristics
+  isCorner?: boolean;
+  features?: string[];
+
+  // Unit type
+  unitTypeId?: string;
+  unitTypeName?: string;
+
+  // Fields from properties fallback / unit_type join
+  bedrooms?: number;
+  bathrooms?: number;
+  orientation?: string;
+  hasBalcony?: boolean;
+  floorNumber?: number;
+  description?: string;
+
+  // Catch-all for non-typed fields
   properties: Record<string, unknown>;
+
   // Buyer info (leaf layers)
   buyerName?: string;
   buyerEmail?: string;
@@ -55,6 +136,7 @@ export interface Media {
   id: string;
   projectId: string;
   layerId?: string;
+  unitTypeId?: string;
   type: MediaType;
   purpose: MediaPurpose;
   storagePath: string;
@@ -64,6 +146,48 @@ export interface Media {
   altText?: string;
   sortOrder: number;
   metadata: Record<string, unknown>;
+}
+
+export interface UnitType {
+  id: string;
+  projectId: string;
+  name: string;
+  slug?: string;
+  area?: number;
+  areaUnit?: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  description?: string;
+}
+
+export interface Scene {
+  id: string;
+  projectId: string;
+  type: 'landing' | 'tour' | 'zone';
+  name: string;
+  slug?: string;
+  imageUrl?: string;
+  imageMobileUrl?: string;
+  hotspotsSvgUrl?: string;
+  sortOrder: number;
+  isLanding: boolean;
+  layerId?: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface SceneTransition {
+  id: string;
+  fromSceneId: string;
+  toSceneId: string;
+  videoUrl?: string;
+  direction: 'next' | 'prev' | 'top';
+}
+
+export interface Domain {
+  id: string;
+  projectId: string;
+  hostname: string;
+  isPrimary: boolean;
 }
 
 // ============================================================
@@ -96,4 +220,3 @@ export interface SiblingExplorerBundle {
   siblingDataMap: Record<string, ExplorerPageData>; // layerId → ExplorerPageData
   siblingOrder: string[];                           // ordered layer IDs (by sortOrder)
 }
-

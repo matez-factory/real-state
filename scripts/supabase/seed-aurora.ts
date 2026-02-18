@@ -32,7 +32,7 @@ interface FloorDef {
   label: string;
   svgElementId: string;
   sortOrder: number;
-  svgPath: string | null; // null = basement (leaf, no children)
+  svgOverlayUrl: string | null; // null = basement (leaf, no children)
 }
 
 // SVG cyclic reuse for residential floors
@@ -48,9 +48,9 @@ function getFloorSvgPath(floorNum: number): string {
 
 const floors: FloorDef[] = [
   // Basements (leaf layers — no children, no SVG)
-  { name: 'Subsuelo 3', slug: 'nivel-as3', label: 'AS3', svgElementId: 'nivel-as3', sortOrder: 0, svgPath: null },
-  { name: 'Subsuelo 2', slug: 'nivel-as2', label: 'AS2', svgElementId: 'nivel-as2', sortOrder: 1, svgPath: null },
-  { name: 'Subsuelo 1', slug: 'nivel-as1', label: 'AS1', svgElementId: 'nivel-as1', sortOrder: 2, svgPath: null },
+  { name: 'Subsuelo 3', slug: 'nivel-as3', label: 'AS3', svgElementId: 'nivel-as3', sortOrder: 0, svgOverlayUrl: null },
+  { name: 'Subsuelo 2', slug: 'nivel-as2', label: 'AS2', svgElementId: 'nivel-as2', sortOrder: 1, svgOverlayUrl: null },
+  { name: 'Subsuelo 1', slug: 'nivel-as1', label: 'AS1', svgElementId: 'nivel-as1', sortOrder: 2, svgOverlayUrl: null },
   // Residential floors 6-26
   ...Array.from({ length: 21 }, (_, i) => {
     const n = i + 6;
@@ -60,7 +60,7 @@ const floors: FloorDef[] = [
       label: `N${n}`,
       svgElementId: `nivel-${n}`,
       sortOrder: i + 3,
-      svgPath: getFloorSvgPath(n),
+      svgOverlayUrl: getFloorSvgPath(n),
     };
   }),
 ];
@@ -73,16 +73,17 @@ interface UnitTypeDef {
   area: number;
   bedrooms: number;
   bathrooms: number;
-  unitType: string;
+  name: string;
+  slug: string;
 }
 
-const UNIT_TYPES: Record<string, UnitTypeDef> = {
-  a: { area: 80, bedrooms: 2, bathrooms: 1, unitType: '2 Ambientes' },
-  b: { area: 106, bedrooms: 3, bathrooms: 2, unitType: '3 Ambientes' },
-  c: { area: 120, bedrooms: 3, bathrooms: 2, unitType: '3 Ambientes' },
-  d: { area: 80, bedrooms: 2, bathrooms: 1, unitType: '2 Ambientes' },
-  e: { area: 106, bedrooms: 3, bathrooms: 2, unitType: '3 Ambientes' },
-  f: { area: 80, bedrooms: 2, bathrooms: 1, unitType: '2 Ambientes' },
+const UNIT_TYPE_DEFS: Record<string, UnitTypeDef> = {
+  a: { area: 80, bedrooms: 2, bathrooms: 1, name: '2 Ambientes', slug: '2amb-80' },
+  b: { area: 106, bedrooms: 3, bathrooms: 2, name: '3 Ambientes 106m²', slug: '3amb-106' },
+  c: { area: 120, bedrooms: 3, bathrooms: 2, name: '3 Ambientes 120m²', slug: '3amb-120' },
+  d: { area: 80, bedrooms: 2, bathrooms: 1, name: '2 Ambientes', slug: '2amb-80' },
+  e: { area: 106, bedrooms: 3, bathrooms: 2, name: '3 Ambientes 106m²', slug: '3amb-106' },
+  f: { area: 80, bedrooms: 2, bathrooms: 1, name: '2 Ambientes', slug: '2amb-80' },
 };
 
 const UNIT_LETTERS = ['a', 'b', 'c', 'd', 'e', 'f'];
@@ -104,32 +105,12 @@ function getUnitStatus(floorNum: number, unitIdx: number): Status {
   return 'available';
 }
 
-function generateUnitProperties(floorNum: number, letter: string): Record<string, unknown> {
-  const typeDef = UNIT_TYPES[letter];
-  const basePricePerSqm = 2200 + (floorNum - 6) * 80; // floor premium
-  const status = getUnitStatus(floorNum, UNIT_LETTERS.indexOf(letter));
-  const price = status === 'sold' ? null : typeDef.area * basePricePerSqm;
-
-  const hasBalcony = letter === 'a' || letter === 'b' || letter === 'c';
-
+function getUnitFeatures(area: number): string[] {
   const baseFeatures = ['Aire acondicionado', 'Calefacción central', 'Portero eléctrico', 'Cochera'];
   const premiumFeatures = ['Piso de porcelanato', 'Cocina equipada', 'Vestidor', 'Toilette'];
-  const features = typeDef.area >= 106
+  return area >= 106
     ? [...baseFeatures, ...premiumFeatures]
     : [...baseFeatures, premiumFeatures[0]];
-
-  return {
-    area: typeDef.area,
-    price,
-    bedrooms: typeDef.bedrooms,
-    bathrooms: typeDef.bathrooms,
-    unit_type: typeDef.unitType,
-    floor_number: floorNum,
-    has_balcony: hasBalcony,
-    orientation: ORIENTATIONS[letter],
-    features,
-    description: `Departamento ${typeDef.unitType.toLowerCase()} de ${typeDef.area}m² en nivel ${floorNum}. ${hasBalcony ? 'Con balcón.' : ''} Orientación ${ORIENTATIONS[letter].toLowerCase()}.`,
-  };
 }
 
 // ============================================================
@@ -143,6 +124,7 @@ async function seed() {
   console.log('Clearing existing data...');
   await supabase.from('media').delete().not('id', 'is', null);
   await supabase.from('layers').delete().not('id', 'is', null);
+  await supabase.from('unit_types').delete().not('id', 'is', null);
   await supabase.from('projects').delete().not('id', 'is', null);
   console.log('  Done\n');
 
@@ -155,13 +137,23 @@ async function seed() {
       name: 'Aurora',
       description: 'Edificio residencial de 24 pisos con departamentos de 2 y 3 ambientes. Vista panorámica y amenities premium.',
       type: 'building',
-      status: 'available',
+      status: 'active',
+      scale: 'medium',
       layer_labels: ['Nivel', 'Departamento'],
       max_depth: 2,
-      svg_path: null,
+      svg_overlay_url: null,
       city: 'Buenos Aires',
       state: 'CABA',
       country: 'Argentina',
+      // Feature toggles
+      has_video_intro: true,
+      has_gallery: true,
+      has_360_tour: true,
+      has_recorrido_360_embed: false,
+      has_downloads: false,
+      has_state_management: true,
+      has_layers_gallery: false,
+      has_zoom_in: false,
     })
     .select()
     .single();
@@ -169,10 +161,32 @@ async function seed() {
   if (projectError) throw projectError;
   console.log(`  Created: ${project.name}\n`);
 
+  // Create unit_types (3 unique types)
+  console.log('Creating unit types...');
+  const uniqueTypes = [
+    { project_id: project.id, name: '2 Ambientes', slug: '2amb-80', area: 80, area_unit: 'm2', bedrooms: 2, bathrooms: 1 },
+    { project_id: project.id, name: '3 Ambientes 106m²', slug: '3amb-106', area: 106, area_unit: 'm2', bedrooms: 3, bathrooms: 2 },
+    { project_id: project.id, name: '3 Ambientes 120m²', slug: '3amb-120', area: 120, area_unit: 'm2', bedrooms: 3, bathrooms: 2 },
+  ];
+
+  const { data: unitTypes, error: unitTypesError } = await supabase
+    .from('unit_types')
+    .insert(uniqueTypes)
+    .select();
+
+  if (unitTypesError) throw unitTypesError;
+
+  // Build slug → id map
+  const unitTypeMap: Record<string, string> = {};
+  for (const ut of unitTypes) {
+    unitTypeMap[ut.slug] = ut.id;
+  }
+  console.log(`  Created ${unitTypes.length} unit types\n`);
+
   let totalLayers = 0;
 
   for (const floor of floors) {
-    const isBasement = floor.svgPath === null;
+    const isBasement = floor.svgOverlayUrl === null;
 
     // Floor layer (depth 0)
     const { data: floorLayer, error: floorError } = await supabase
@@ -180,6 +194,7 @@ async function seed() {
       .insert({
         project_id: project.id,
         parent_id: null,
+        type: 'floor',
         depth: 0,
         sort_order: floor.sortOrder,
         slug: floor.slug,
@@ -187,7 +202,7 @@ async function seed() {
         label: floor.label,
         svg_element_id: floor.svgElementId,
         status: isBasement ? 'not_available' : 'available',
-        svg_path: floor.svgPath,
+        svg_overlay_url: floor.svgOverlayUrl,
         properties: isBasement
           ? { description: `${floor.name} — Estacionamiento y servicios` }
           : {},
@@ -206,19 +221,45 @@ async function seed() {
     // Unit layers (depth 1) — 6 per residential floor
     const floorNum = parseInt(floor.slug.replace('nivel-', ''), 10);
 
-    const unitsToInsert = UNIT_LETTERS.map((letter, idx) => ({
-      project_id: project.id,
-      parent_id: floorLayer.id,
-      depth: 1,
-      sort_order: idx,
-      slug: `nivel-${floorNum}-depto-${letter}`,
-      name: `Depto ${letter.toUpperCase()}`,
-      label: letter.toUpperCase(),
-      svg_element_id: letter,
-      status: getUnitStatus(floorNum, idx),
-      svg_path: null,
-      properties: generateUnitProperties(floorNum, letter),
-    }));
+    const unitsToInsert = UNIT_LETTERS.map((letter, idx) => {
+      const typeDef = UNIT_TYPE_DEFS[letter];
+      const status = getUnitStatus(floorNum, idx);
+      const basePricePerSqm = 2200 + (floorNum - 6) * 80;
+      const price = status === 'sold' ? null : typeDef.area * basePricePerSqm;
+      const hasBalcony = letter === 'a' || letter === 'b' || letter === 'c';
+
+      return {
+        project_id: project.id,
+        parent_id: floorLayer.id,
+        type: 'unit',
+        depth: 1,
+        sort_order: idx,
+        slug: `nivel-${floorNum}-depto-${letter}`,
+        name: `Depto ${letter.toUpperCase()}`,
+        label: letter.toUpperCase(),
+        svg_element_id: letter,
+        status,
+        svg_overlay_url: null,
+        // Typed columns
+        area: typeDef.area,
+        area_unit: 'm2',
+        price,
+        currency: 'USD',
+        is_corner: false,
+        features: getUnitFeatures(typeDef.area),
+        unit_type_id: unitTypeMap[typeDef.slug],
+        // Fields without typed columns go in properties
+        properties: {
+          orientation: ORIENTATIONS[letter],
+          floor_number: floorNum,
+          has_balcony: hasBalcony,
+          bedrooms: typeDef.bedrooms,
+          bathrooms: typeDef.bathrooms,
+          unit_type: typeDef.name,
+          description: `Departamento ${typeDef.name.toLowerCase()} de ${typeDef.area}m² en nivel ${floorNum}. ${hasBalcony ? 'Con balcón.' : ''} Orientación ${ORIENTATIONS[letter].toLowerCase()}.`,
+        },
+      };
+    });
 
     const { error: unitsError } = await supabase.from('layers').insert(unitsToInsert);
     if (unitsError) throw unitsError;
@@ -227,11 +268,12 @@ async function seed() {
     console.log(`  Floor: ${floor.slug} (${unitsToInsert.length} units)`);
   }
 
-  const basementCount = floors.filter((f) => f.svgPath === null).length;
+  const basementCount = floors.filter((f) => f.svgOverlayUrl === null).length;
   const residentialCount = floors.length - basementCount;
 
   console.log(`\nSeed complete!`);
   console.log(`  Project: ${project.name}`);
+  console.log(`  Unit types: ${unitTypes.length}`);
   console.log(`  Total layers: ${totalLayers}`);
   console.log(`    Basements: ${basementCount}`);
   console.log(`    Residential floors: ${residentialCount}`);

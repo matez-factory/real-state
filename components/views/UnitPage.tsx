@@ -24,23 +24,10 @@ export function UnitPage({ data }: UnitPageProps) {
 
   if (!currentLayer) return null;
 
-  const props = currentLayer.properties;
-  const galleryMedia = media.filter((m) => m.type === 'image' && (m.purpose === 'gallery' || m.purpose === 'cover' || m.purpose === 'floor_plan'));
+  const galleryMedia = media.filter((m) => m.type === 'image' && (m.purpose === 'gallery' || m.purpose === 'thumbnail' || m.purpose === 'ficha_furnished' || m.purpose === 'ficha_measured'));
   const allMedia = media.filter((m) => m.type === 'image');
 
-  const area = props.area as number | undefined;
-  const price = props.price as number | undefined;
-  const description = props.description as string | undefined;
-  const orientation = props.orientation as string | undefined;
-  const features = props.features as string[] | undefined;
-  const frontMeters = props.front_meters as number | undefined;
-  const depthMeters = props.depth_meters as number | undefined;
-  const isCorner = props.is_corner as boolean | undefined;
-  const bedrooms = props.bedrooms as number | undefined;
-  const bathrooms = props.bathrooms as number | undefined;
-  const unitType = props.unit_type as string | undefined;
-  const hasBalcony = props.has_balcony as boolean | undefined;
-  const floorNumber = props.floor_number as number | undefined;
+  const { area, price, description, orientation, features, frontLength, depthLength, isCorner, bedrooms, bathrooms, unitTypeName, hasBalcony, floorNumber } = currentLayer;
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -87,10 +74,10 @@ export function UnitPage({ data }: UnitPageProps) {
             <div className="glass-panel p-5 space-y-4">
               <h3 className="font-semibold text-white">Detalles</h3>
 
-              {unitType && (
+              {unitTypeName && (
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-400">Tipo</span>
-                  <span className="text-sm font-medium text-white">{unitType}</span>
+                  <span className="text-sm font-medium text-white">{unitTypeName}</span>
                 </div>
               )}
 
@@ -112,13 +99,13 @@ export function UnitPage({ data }: UnitPageProps) {
                 </div>
               )}
 
-              {(frontMeters || depthMeters) && (
+              {(frontLength || depthLength) && (
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-400">Dimensiones</span>
                   <span className="text-sm font-medium text-white">
-                    {frontMeters && `${frontMeters}m`}
-                    {frontMeters && depthMeters && ' × '}
-                    {depthMeters && `${depthMeters}m`}
+                    {frontLength && `${frontLength}m`}
+                    {frontLength && depthLength && ' × '}
+                    {depthLength && `${depthLength}m`}
                   </span>
                 </div>
               )}
@@ -135,7 +122,7 @@ export function UnitPage({ data }: UnitPageProps) {
             <div className="glass-panel p-5">
               <h3 className="font-semibold text-white mb-3">Características</h3>
               <ul className="space-y-2">
-                {isCorner && project.type === 'subdivision' && (
+                {isCorner && project.type === 'lots' && (
                   <li className="flex items-center text-sm text-gray-300">
                     <span className="text-green-400 mr-2">✓</span>
                     Lote de esquina
@@ -180,8 +167,6 @@ export function UnitPage({ data }: UnitPageProps) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {siblings.map((sibling) => {
                 const isCurrent = sibling.id === currentLayer.id;
-                const siblingPrice = sibling.properties.price as number | undefined;
-                const siblingArea = sibling.properties.area as number | undefined;
                 return (
                   <button
                     key={sibling.id}
@@ -194,12 +179,12 @@ export function UnitPage({ data }: UnitPageProps) {
                     }`}
                   >
                     <div className="font-semibold text-white">{sibling.name}</div>
-                    {siblingArea && (
-                      <div className="text-xs text-gray-400 mt-1">{siblingArea} m²</div>
+                    {sibling.area && (
+                      <div className="text-xs text-gray-400 mt-1">{sibling.area} m²</div>
                     )}
-                    {siblingPrice && (
+                    {sibling.price && (
                       <div className="text-sm font-medium text-green-400 mt-1">
-                        ${siblingPrice.toLocaleString()}
+                        ${sibling.price.toLocaleString()}
                       </div>
                     )}
                     <div className={`mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_CLASSES[sibling.status]}`}>

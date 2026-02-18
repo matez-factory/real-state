@@ -27,15 +27,23 @@ export function ProjectHomePage({ data }: ProjectHomePageProps) {
 
   const [currentView, setCurrentView] = useState<View>('exterior');
 
-  const spinSvgs = useMemo(
-    () => (data.project.settings?.spin_svgs as Record<string, string>) ?? {},
-    [data.project.settings]
-  );
+  // Build spinSvgs from media rows (type='svg', purpose='hotspot') instead of project.settings
+  const spinSvgs = useMemo(() => {
+    const svgMedia = data.media.filter((m) => m.type === 'svg' && m.purpose === 'hotspot');
+    const result: Record<string, string> = {};
+    for (const m of svgMedia) {
+      const viewpoint = (m.metadata as Record<string, unknown>)?.viewpoint as string | undefined;
+      if (viewpoint && m.url) {
+        result[viewpoint] = m.url;
+      }
+    }
+    return result;
+  }, [data.media]);
 
   // Find last residential floor (top floor) to navigate into
   const targetFloor = useMemo(() => {
     const residential = data.children
-      .filter((c) => c.svgPath != null)
+      .filter((c) => c.svgOverlayUrl != null)
       .sort((a, b) => a.sortOrder - b.sortOrder);
     return residential[residential.length - 1] ?? data.children[data.children.length - 1];
   }, [data.children]);
@@ -50,11 +58,13 @@ export function ProjectHomePage({ data }: ProjectHomePageProps) {
   const preloadUrls = useMemo(() => {
     if (!targetFloor) return [];
     const urls: string[] = [];
-    if (targetFloor.svgPath) urls.push(targetFloor.svgPath);
+    if (targetFloor.svgOverlayUrl) urls.push(targetFloor.svgOverlayUrl);
     const bg = data.childrenMedia[targetFloor.id]?.find(
-      (m) => m.purpose === 'exploration' && m.type === 'image'
+      (m) => m.purpose === 'background' && m.type === 'image'
     );
     if (bg?.url) urls.push(bg.url);
+    // Also try the layer's own backgroundImageUrl
+    if (targetFloor.backgroundImageUrl) urls.push(targetFloor.backgroundImageUrl);
     return urls;
   }, [targetFloor, data.childrenMedia]);
 

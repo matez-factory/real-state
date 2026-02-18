@@ -1,4 +1,4 @@
-import { EntityStatus } from '@/types/hierarchy.types';
+import { EntityStatus, ProjectStatus } from '@/types/hierarchy.types';
 
 export const STATUS_LABELS: Record<EntityStatus, string> = {
   available: 'Disponible',
@@ -42,4 +42,16 @@ export const STATUS_COLORS: Record<EntityStatus, { fill: string; stroke: string;
     stroke: '#9E9E9E',
     indicator: '#9E9E9E',
   },
+};
+
+export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
+  draft: 'Borrador',
+  active: 'Activo',
+  archived: 'Archivado',
+};
+
+export const PROJECT_STATUS_CLASSES: Record<ProjectStatus, string> = {
+  draft: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30',
+  active: 'bg-green-500/20 text-green-400 border border-green-500/30',
+  archived: 'bg-gray-500/20 text-gray-400 border border-gray-500/30',
 };

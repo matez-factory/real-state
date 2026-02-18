@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getProjects } from '@/lib/data/repository';
-import { STATUS_CLASSES, STATUS_LABELS } from '@/lib/constants/status';
+import { PROJECT_STATUS_CLASSES, PROJECT_STATUS_LABELS } from '@/lib/constants/status';
 
 export default async function HomePage() {
   const projects = await getProjects();
@@ -31,10 +31,10 @@ export default async function HomePage() {
             >
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-sm px-2 py-1 rounded-full bg-blue-500/20 text-blue-400 font-medium">
-                  {project.type === 'subdivision' ? 'Loteo' : 'Edificio'}
+                  {project.type === 'lots' ? 'Loteo' : project.type === 'building' ? 'Edificio' : 'Masterplan'}
                 </span>
-                <span className={`text-sm px-2 py-1 rounded-full font-medium ${STATUS_CLASSES[project.status]}`}>
-                  {STATUS_LABELS[project.status]}
+                <span className={`text-sm px-2 py-1 rounded-full font-medium ${PROJECT_STATUS_CLASSES[project.status]}`}>
+                  {PROJECT_STATUS_LABELS[project.status]}
                 </span>
               </div>
               <h2 className="text-xl font-bold text-white">{project.name}</h2>

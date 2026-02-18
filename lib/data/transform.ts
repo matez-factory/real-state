@@ -6,6 +6,9 @@ import {
   SiblingExplorerBundle,
   EntityStatus,
   ProjectType,
+  ProjectStatus,
+  ProjectScale,
+  LayerType,
   MediaType,
   MediaPurpose,
   BreadcrumbItem,
@@ -22,42 +25,98 @@ export interface RawProject {
   description: string | null;
   type: string;
   status: string;
+  scale: string;
   layer_labels: string[];
   max_depth: number;
-  svg_path: string | null;
+  svg_overlay_url: string | null;
+
+  // Location
   address: string | null;
   city: string | null;
   state: string | null;
   country: string | null;
   coordinates: { lat: number; lng: number } | null;
-  settings: Record<string, unknown>;
+  google_maps_embed_url: string | null;
+
+  // Branding
+  logo_url: string | null;
+  secondary_logo_url: string | null;
+  tagline: string | null;
+
+  // Contact
+  phone: string | null;
+  email: string | null;
+  whatsapp: string | null;
+  website: string | null;
+
+  // Feature toggles
+  has_video_intro: boolean;
+  has_gallery: boolean;
+  has_360_tour: boolean;
+  has_recorrido_360_embed: boolean;
+  recorrido_360_embed_url: string | null;
+  has_downloads: boolean;
+  has_state_management: boolean;
+  has_layers_gallery: boolean;
+  has_zoom_in: boolean;
 }
 
 export interface RawLayer {
   id: string;
   project_id: string;
   parent_id: string | null;
+  type: string;
   depth: number;
   sort_order: number;
   slug: string;
   name: string;
   label: string | null;
+  path: string | null;
+  parent_name: string | null;
   svg_element_id: string | null;
   status: string;
-  svg_path: string | null;
-  properties: Record<string, unknown>;
+
+  // Visual assets
+  svg_overlay_url: string | null;
+  svg_overlay_mobile_url: string | null;
+  background_image_url: string | null;
+  background_image_mobile_url: string | null;
+
+  // Dimensions
+  area: number | null;
+  area_unit: string | null;
+  front_length: number | null;
+  depth_length: number | null;
+
+  // Pricing
+  price: number | null;
+  currency: string | null;
+  price_per_unit: number | null;
+
+  // Characteristics
+  is_corner: boolean | null;
+  features: string[] | null;
+
+  // Unit type
+  unit_type_id: string | null;
+
+  // Buyer info
   buyer_name: string | null;
   buyer_email: string | null;
   buyer_phone: string | null;
   buyer_notes: string | null;
   reserved_at: string | null;
   sold_at: string | null;
+
+  // Catch-all
+  properties: Record<string, unknown>;
 }
 
 export interface RawMedia {
   id: string;
   project_id: string;
   layer_id: string | null;
+  unit_type_id: string | null;
   type: string;
   purpose: string;
   storage_path: string;
@@ -80,33 +139,88 @@ export function transformProject(raw: RawProject): Project {
     name: raw.name,
     description: raw.description || undefined,
     type: raw.type as ProjectType,
-    status: raw.status as EntityStatus,
-    layerLabels: raw.layer_labels,
+    status: raw.status as ProjectStatus,
+    scale: (raw.scale || 'small') as ProjectScale,
+    layerLabels: raw.layer_labels ?? [],
     maxDepth: raw.max_depth,
-    svgPath: raw.svg_path || undefined,
+    svgOverlayUrl: raw.svg_overlay_url || undefined,
     address: raw.address || undefined,
     city: raw.city || undefined,
     state: raw.state || undefined,
     country: raw.country || undefined,
     coordinates: raw.coordinates || undefined,
-    settings: raw.settings,
+    googleMapsEmbedUrl: raw.google_maps_embed_url || undefined,
+    logoUrl: raw.logo_url || undefined,
+    secondaryLogoUrl: raw.secondary_logo_url || undefined,
+    tagline: raw.tagline || undefined,
+    phone: raw.phone || undefined,
+    email: raw.email || undefined,
+    whatsapp: raw.whatsapp || undefined,
+    website: raw.website || undefined,
+    hasVideoIntro: raw.has_video_intro ?? false,
+    hasGallery: raw.has_gallery ?? false,
+    has360Tour: raw.has_360_tour ?? true,
+    hasRecorrido360Embed: raw.has_recorrido_360_embed ?? false,
+    recorrido360EmbedUrl: raw.recorrido_360_embed_url || undefined,
+    hasDownloads: raw.has_downloads ?? false,
+    hasStateManagement: raw.has_state_management ?? true,
+    hasLayersGallery: raw.has_layers_gallery ?? false,
+    hasZoomIn: raw.has_zoom_in ?? false,
   };
 }
 
 export function transformLayer(raw: RawLayer): Layer {
+  const props = raw.properties ?? {};
+
   return {
     id: raw.id,
     projectId: raw.project_id,
     parentId: raw.parent_id,
+    type: raw.type as LayerType,
     depth: raw.depth,
     sortOrder: raw.sort_order,
     slug: raw.slug,
     name: raw.name,
     label: raw.label || raw.name,
+    path: raw.path || undefined,
+    parentName: raw.parent_name || undefined,
     svgElementId: raw.svg_element_id || undefined,
     status: raw.status as EntityStatus,
-    svgPath: raw.svg_path || undefined,
-    properties: raw.properties,
+
+    // Visual assets
+    svgOverlayUrl: raw.svg_overlay_url || undefined,
+    svgOverlayMobileUrl: raw.svg_overlay_mobile_url || undefined,
+    backgroundImageUrl: raw.background_image_url || undefined,
+    backgroundImageMobileUrl: raw.background_image_mobile_url || undefined,
+
+    // Dimensions
+    area: raw.area ?? (props.area as number | undefined) ?? undefined,
+    areaUnit: raw.area_unit || undefined,
+    frontLength: raw.front_length ?? (props.front_meters as number | undefined) ?? undefined,
+    depthLength: raw.depth_length ?? (props.depth_meters as number | undefined) ?? undefined,
+
+    // Pricing
+    price: raw.price ?? (props.price as number | undefined) ?? undefined,
+    currency: raw.currency || undefined,
+    pricePerUnit: raw.price_per_unit ?? undefined,
+
+    // Characteristics
+    isCorner: raw.is_corner ?? (props.is_corner as boolean | undefined) ?? undefined,
+    features: raw.features ?? (props.features as string[] | undefined) ?? undefined,
+
+    // Unit type
+    unitTypeId: raw.unit_type_id || undefined,
+    unitTypeName: (props.unit_type as string | undefined) ?? undefined,
+
+    // Fallback from properties (backward compat)
+    bedrooms: (props.bedrooms as number | undefined) ?? undefined,
+    bathrooms: (props.bathrooms as number | undefined) ?? undefined,
+    orientation: (props.orientation as string | undefined) ?? undefined,
+    hasBalcony: (props.has_balcony as boolean | undefined) ?? undefined,
+    floorNumber: (props.floor_number as number | undefined) ?? undefined,
+    description: (props.description as string | undefined) ?? undefined,
+
+    properties: props,
     buyerName: raw.buyer_name || undefined,
     buyerEmail: raw.buyer_email || undefined,
     buyerPhone: raw.buyer_phone || undefined,
@@ -121,6 +235,7 @@ export function transformMedia(raw: RawMedia): Media {
     id: raw.id,
     projectId: raw.project_id,
     layerId: raw.layer_id || undefined,
+    unitTypeId: raw.unit_type_id || undefined,
     type: raw.type as MediaType,
     purpose: raw.purpose as MediaPurpose,
     storagePath: raw.storage_path,

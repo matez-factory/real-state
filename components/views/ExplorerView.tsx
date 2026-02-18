@@ -30,9 +30,9 @@ export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
   useEffect(() => {
     if (!siblingBundle) return;
     for (const d of Object.values(siblingBundle.siblingDataMap)) {
-      const svg = d.currentLayer?.svgPath ?? d.project.svgPath;
+      const svg = d.currentLayer?.svgOverlayUrl ?? d.project.svgOverlayUrl;
       if (svg) fetch(svg);
-      const bg = d.media.find((m) => m.purpose === 'exploration' && m.type === 'image');
+      const bg = d.media.find((m) => m.purpose === 'background' && m.type === 'image');
       if (bg?.url) { const img = new Image(); img.src = bg.url; }
     }
   }, [siblingBundle]);
@@ -43,10 +43,10 @@ export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
 
   const { project, currentLayer, children, breadcrumbs, currentPath, siblings } = activeData;
   const basePath = `/p/${project.slug}${currentPath.length > 0 ? '/' + currentPath.join('/') : ''}`;
-  const svgUrl = currentLayer?.svgPath ?? project.svgPath;
+  const svgUrl = currentLayer?.svgOverlayUrl ?? project.svgOverlayUrl;
   const currentLabel = project.layerLabels[currentLayer?.depth ?? -1] ?? '';
   const showSiblings = siblings.length > 1 && currentLayer != null;
-  const backgroundUrl = activeData.media.find((m) => m.purpose === 'exploration' && m.type === 'image')?.url;
+  const backgroundUrl = activeData.media.find((m) => m.purpose === 'background' && m.type === 'image')?.url ?? currentLayer?.backgroundImageUrl;
   const availableCount = children.filter((c) => c.status === 'available').length;
   const title = currentLayer ? currentLayer.name : project.name;
 

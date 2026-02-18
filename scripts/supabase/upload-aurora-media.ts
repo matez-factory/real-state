@@ -5,7 +5,7 @@ import path from 'path';
 
 /**
  * Upload Aurora media to Supabase Storage and create media rows.
- * Reads files directly from public/content/aurora/ (no HTTP downloads).
+ * Reads files from the content source directory (Contenido app- Edificio).
  *
  * Usage: npx tsx scripts/supabase/upload-aurora-media.ts
  */
@@ -23,7 +23,13 @@ if (!supabaseUrl || !supabaseServiceKey) {
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const BUCKET = 'project-media';
-const CONTENT_DIR = path.resolve(__dirname, '../../public/content/aurora');
+
+// Source content directory
+const CONTENT_BASE = path.resolve(__dirname, '../../../Contenido app- Edificio');
+const EXTERIOR_DIR = path.join(CONTENT_BASE, 'EXTERIOR - SPIN360');
+const FICHAS_DIR = path.join(CONTENT_BASE, 'FICHAS');
+const NIVELES_DIR = path.join(CONTENT_BASE, 'NIVELES - SWIPE');
+const VUELOS_DIR = path.join(CONTENT_BASE, 'VUELOS AL TOP');
 
 // ============================================================
 // Helpers
@@ -40,8 +46,8 @@ async function ensureBucket() {
   console.log(`Bucket "${BUCKET}" ready\n`);
 }
 
-function readFile(relativePath: string): Buffer {
-  const fullPath = path.join(CONTENT_DIR, relativePath);
+function readFileFrom(dir: string, fileName: string): Buffer {
+  const fullPath = path.join(dir, fileName);
   return fs.readFileSync(fullPath);
 }
 
@@ -55,7 +61,8 @@ function contentType(filePath: string): string {
 async function uploadAndCreateMedia(opts: {
   projectId: string;
   layerId: string | null;
-  localPath: string;
+  sourceDir: string;
+  fileName: string;
   storagePath: string;
   type: 'image' | 'video';
   purpose: string;
@@ -64,8 +71,8 @@ async function uploadAndCreateMedia(opts: {
   metadata?: Record<string, unknown>;
 }): Promise<boolean> {
   try {
-    const buffer = readFile(opts.localPath);
-    const ct = contentType(opts.localPath);
+    const buffer = readFileFrom(opts.sourceDir, opts.fileName);
+    const ct = contentType(opts.fileName);
 
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)
@@ -89,7 +96,7 @@ async function uploadAndCreateMedia(opts: {
       alt_text: opts.title,
       sort_order: opts.sortOrder,
       metadata: {
-        format: opts.localPath.split('.').pop(),
+        format: opts.fileName.split('.').pop(),
         size_bytes: buffer.length,
         ...opts.metadata,
       },
@@ -114,22 +121,22 @@ async function uploadAndCreateMedia(opts: {
 
 // Basement floors get their own unique images
 const BASEMENT_IMAGE_MAP: Record<string, string> = {
-  'nivel-as3': '00_Nivel_AS3',
-  'nivel-as2': '22_Nivel_AS2',
-  'nivel-as1': '23_Nivel_AS1',
+  'nivel-as3': '00_Nivel_AS3.jpg',
+  'nivel-as2': '22_Nivel_AS2.jpg',
+  'nivel-as1': '23_Nivel_AS1.jpg',
 };
 
 // Residential floors: background must match the SVG they use,
 // since the SVG outlines were drawn to align with specific renders.
 // SVG cycle: (floorNum - 6) % 4 → 0=nivel-06, 1=nivel-07, 2=nivel-08, 3=nivel-09
 const SVG_MATCHED_IMAGES: Record<number, string> = {
-  0: '21_Nivel_06', // nivel-06.svg → 21_Nivel_06.jpg
-  1: '20_Nivel_07', // nivel-07.svg → 20_Nivel_07.jpg
-  2: '19_Nivel_08', // nivel-08.svg → 19_Nivel_08.jpg
-  3: '18_Nivel_09', // nivel-09.svg → 18_Nivel_09.jpg
+  0: '21_Nivel_06.jpg', // SVG_nivel_06.svg → 21_Nivel_06.jpg
+  1: '20_Nivel_07.jpg', // SVG_nivel_07.svg → 20_Nivel_07.jpg
+  2: '19_Nivel_08.jpg', // SVG_nivel_08.svg → 19_Nivel_08.jpg
+  3: '18_Nivel_09.jpg', // SVG_nivel_09.svg → 18_Nivel_09.jpg
 };
 
-function getFloorImagePrefix(slug: string): string | null {
+function getFloorImageFile(slug: string): string | null {
   // Basements
   if (BASEMENT_IMAGE_MAP[slug]) return BASEMENT_IMAGE_MAP[slug];
 
@@ -156,6 +163,7 @@ const UNIT_AREA_MAP: Record<string, string> = {
 
 async function run() {
   console.log('Starting Aurora media upload...\n');
+  console.log(`Content source: ${CONTENT_BASE}\n`);
 
   await ensureBucket();
 
@@ -167,7 +175,7 @@ async function run() {
     .single();
 
   if (projectError || !project) {
-    console.error('Project "aurora" not found. Run db:seed-aurora first.');
+    console.error('Project "aurora" not found. Run db:seed first.');
     process.exit(1);
   }
 
@@ -183,27 +191,27 @@ async function run() {
   // ==========================================
   console.log('=== Project-level media ===');
 
-  // Cover image
+  // Thumbnail image
   if (await uploadAndCreateMedia({
     projectId: project.id, layerId: null,
-    localPath: 'exterior/home_img.jpg',
+    sourceDir: EXTERIOR_DIR, fileName: 'home_img.jpg',
     storagePath: 'aurora/project/home_img.jpg',
-    type: 'image', purpose: 'cover', title: 'Aurora - Fachada', sortOrder: 0,
+    type: 'image', purpose: 'thumbnail', title: 'Aurora - Fachada', sortOrder: 0,
     metadata: { viewpoint: 'home' },
   })) count++;
 
-  // Exploration background
+  // Background image
   if (await uploadAndCreateMedia({
     projectId: project.id, layerId: null,
-    localPath: 'exterior/intro_img.jpg',
+    sourceDir: EXTERIOR_DIR, fileName: 'intro_img.jpg',
     storagePath: 'aurora/project/intro_img.jpg',
-    type: 'image', purpose: 'exploration', title: 'Aurora - Vista general', sortOrder: 0,
+    type: 'image', purpose: 'background', title: 'Aurora - Vista general', sortOrder: 0,
   })) count++;
 
   // Spin viewpoint images
   if (await uploadAndCreateMedia({
     projectId: project.id, layerId: null,
-    localPath: 'exterior/home_img.jpg',
+    sourceDir: EXTERIOR_DIR, fileName: 'home_img.jpg',
     storagePath: 'aurora/spin/home_img.jpg',
     type: 'image', purpose: 'gallery', title: 'Vista Home', sortOrder: 1,
     metadata: { viewpoint: 'home' },
@@ -211,7 +219,7 @@ async function run() {
 
   if (await uploadAndCreateMedia({
     projectId: project.id, layerId: null,
-    localPath: 'exterior/spin_pointa_img.jpg',
+    sourceDir: EXTERIOR_DIR, fileName: 'spin_pointa_img.jpg',
     storagePath: 'aurora/spin/spin_pointa_img.jpg',
     type: 'image', purpose: 'gallery', title: 'Vista A', sortOrder: 2,
     metadata: { viewpoint: 'point-a' },
@@ -219,7 +227,7 @@ async function run() {
 
   if (await uploadAndCreateMedia({
     projectId: project.id, layerId: null,
-    localPath: 'exterior/spin_point_b.jpg',
+    sourceDir: EXTERIOR_DIR, fileName: 'spin_point_b.jpg',
     storagePath: 'aurora/spin/spin_point_b.jpg',
     type: 'image', purpose: 'gallery', title: 'Vista B', sortOrder: 3,
     metadata: { viewpoint: 'point-b' },
@@ -228,15 +236,13 @@ async function run() {
   // Intro video
   if (await uploadAndCreateMedia({
     projectId: project.id, layerId: null,
-    localPath: 'exterior/intro_video.mp4',
+    sourceDir: EXTERIOR_DIR, fileName: 'intro_video.mp4',
     storagePath: 'aurora/spin/intro_video.mp4',
     type: 'video', purpose: 'transition', title: 'Intro', sortOrder: 0,
     metadata: { from_viewpoint: 'intro', to_viewpoint: 'home' },
   })) count++;
 
   // Transition videos
-  // avance: suffix = destination (avance_a = advance TO point-a)
-  // retroceso: suffix = departure (retroceso_a = retreat FROM point-a)
   const transitions = [
     { file: 'video_avance_a.mp4', from: 'home', to: 'point-a', title: 'Avance Home → A' },
     { file: 'video_avance_b.mp4', from: 'point-a', to: 'point-b', title: 'Avance A → B' },
@@ -250,20 +256,20 @@ async function run() {
     const t = transitions[i];
     if (await uploadAndCreateMedia({
       projectId: project.id, layerId: null,
-      localPath: `exterior/${t.file}`,
+      sourceDir: EXTERIOR_DIR, fileName: t.file,
       storagePath: `aurora/spin/${t.file}`,
       type: 'video', purpose: 'transition', title: t.title, sortOrder: i + 1,
       metadata: { from_viewpoint: t.from, to_viewpoint: t.to },
     })) count++;
   }
 
-  // Aerial videos (also serve as entrance transitions)
+  // Aerial videos
   const aerialVideos = ['aurora-01-top.mp4', 'aurora-02-top.mp4', 'aurora-03-top.mp4'];
   const aerialViewpoints = ['home', 'point-a', 'point-b'];
   for (let i = 0; i < aerialVideos.length; i++) {
     if (await uploadAndCreateMedia({
       projectId: project.id, layerId: null,
-      localPath: `videos/${aerialVideos[i]}`,
+      sourceDir: VUELOS_DIR, fileName: aerialVideos[i],
       storagePath: `aurora/videos/${aerialVideos[i]}`,
       type: 'video', purpose: 'gallery', title: `Vuelo aéreo ${i + 1}`, sortOrder: 10 + i,
       metadata: { category: 'aerial', entrance_from_viewpoint: aerialViewpoints[i] },
@@ -271,7 +277,7 @@ async function run() {
   }
 
   // ==========================================
-  // 2. Floor-level media (3D renders)
+  // 2. Floor-level media (3D renders) — 'background' purpose
   // ==========================================
   console.log('\n=== Floor exploration backgrounds ===');
 
@@ -283,22 +289,66 @@ async function run() {
     .order('sort_order');
 
   for (const floor of allFloors ?? []) {
-    const filePrefix = getFloorImagePrefix(floor.slug);
-    if (!filePrefix) {
+    const imageFile = getFloorImageFile(floor.slug);
+    if (!imageFile) {
       console.log(`  Skipping ${floor.slug} (no image mapping)`);
       continue;
     }
 
-    if (await uploadAndCreateMedia({
-      projectId: project.id, layerId: floor.id,
-      localPath: `niveles/${filePrefix}.jpg`,
-      storagePath: `aurora/niveles/${floor.slug}.jpg`,
-      type: 'image', purpose: 'exploration', title: `Render ${floor.slug}`, sortOrder: 0,
-    })) count++;
+    try {
+      const buffer = readFileFrom(NIVELES_DIR, imageFile);
+      const storagePath = `aurora/niveles/${floor.slug}.jpg`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(BUCKET)
+        .upload(storagePath, buffer, { contentType: 'image/jpeg', upsert: true });
+
+      if (uploadError) {
+        console.error(`    Upload failed for ${floor.slug}: ${uploadError.message}`);
+        continue;
+      }
+
+      const { data: publicUrl } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
+      const url = publicUrl.publicUrl;
+
+      // Create media row with 'background' purpose
+      const { error: mediaError } = await supabase.from('media').insert({
+        project_id: project.id,
+        layer_id: floor.id,
+        type: 'image',
+        purpose: 'background',
+        storage_path: storagePath,
+        url,
+        title: `Render ${floor.slug}`,
+        alt_text: `Render ${floor.slug}`,
+        sort_order: 0,
+        metadata: { format: 'jpg', size_bytes: buffer.length },
+      });
+
+      if (mediaError) {
+        console.error(`    Media row failed for ${floor.slug}: ${mediaError.message}`);
+        continue;
+      }
+
+      // Also set background_image_url on the layer itself
+      const { error: updateError } = await supabase
+        .from('layers')
+        .update({ background_image_url: url })
+        .eq('id', floor.id);
+
+      if (updateError) {
+        console.error(`    Layer update failed for ${floor.slug}: ${updateError.message}`);
+      }
+
+      console.log(`    ✓ ${storagePath} (${(buffer.length / 1024).toFixed(0)}KB)`);
+      count++;
+    } catch (err) {
+      console.error(`    Error for ${floor.slug}: ${err instanceof Error ? err.message : err}`);
+    }
   }
 
   // ==========================================
-  // 3. Unit-level media (floor plans)
+  // 3. Unit-level media (floor plans) — 'ficha_furnished' / 'ficha_measured'
   // ==========================================
   console.log('\n=== Unit floor plans ===');
 
@@ -315,18 +365,22 @@ async function run() {
   console.log('  Uploading 12 unique floor plan images...');
   const planUrls: Record<string, string> = {};
   for (const file of planFiles) {
-    const buffer = readFile(`fichas/${file}`);
-    const storagePath = `aurora/fichas/${file}`;
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(storagePath, buffer, { contentType: 'image/jpeg', upsert: true });
-    if (error) {
-      console.error(`    Upload failed for ${file}: ${error.message}`);
-      continue;
+    try {
+      const buffer = readFileFrom(FICHAS_DIR, file);
+      const storagePath = `aurora/fichas/${file}`;
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(storagePath, buffer, { contentType: 'image/jpeg', upsert: true });
+      if (error) {
+        console.error(`    Upload failed for ${file}: ${error.message}`);
+        continue;
+      }
+      const { data: publicUrl } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
+      planUrls[file] = publicUrl.publicUrl;
+      console.log(`    ✓ ${file}`);
+    } catch (err) {
+      console.error(`    Error for ${file}: ${err instanceof Error ? err.message : err}`);
     }
-    const { data: publicUrl } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
-    planUrls[file] = publicUrl.publicUrl;
-    console.log(`    ✓ ${file}`);
   }
 
   // Get all units
@@ -344,9 +398,13 @@ async function run() {
     'Planta con medidas', 'Planta con medidas (alt)',
   ];
 
+  const planPurposes = [
+    'ficha_furnished', 'ficha_furnished',
+    'ficha_measured', 'ficha_measured',
+  ];
+
   let unitMediaCount = 0;
   for (const unit of units ?? []) {
-    // Extract unit letter from slug: "nivel-6-depto-a" → "a"
     const letter = unit.slug.split('-').pop()!;
     const areaPrefix = UNIT_AREA_MAP[letter];
     if (!areaPrefix) continue;
@@ -366,7 +424,7 @@ async function run() {
           project_id: project.id,
           layer_id: unit.id,
           type: 'image' as const,
-          purpose: 'floor_plan' as const,
+          purpose: planPurposes[idx],
           storage_path: `aurora/fichas/${file}`,
           url,
           title: planTitles[idx],
