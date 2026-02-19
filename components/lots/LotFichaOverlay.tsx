@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import {
-  X,
+  ChevronLeft,
   Ruler,
   Grid3X3,
   Flame,
@@ -12,6 +12,9 @@ import {
   Phone,
   Share2,
   Check,
+  Home,
+  Map,
+  MapPin,
 } from 'lucide-react';
 import { Layer, Media, Project } from '@/types/hierarchy.types';
 import { STATUS_LABELS } from '@/lib/constants/status';
@@ -22,6 +25,8 @@ interface LotFichaOverlayProps {
   project: Project;
   logos: Media[];
   onClose: () => void;
+  onNavigate?: (section: 'home' | 'map' | 'location' | 'contact') => void;
+  onContactOpen?: () => void;
 }
 
 const STATUS_BADGE_STYLES: Record<string, string> = {
@@ -33,18 +38,29 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
 
 const FEATURE_ICONS = [Flame, Car, DollarSign];
 
+const NAV_ITEMS: { section: 'home' | 'map' | 'location' | 'contact'; icon: typeof Home; label: string }[] = [
+  { section: 'home', icon: Home, label: 'Inicio' },
+  { section: 'map', icon: Map, label: 'Mapa' },
+  { section: 'location', icon: MapPin, label: 'Ubicación' },
+  { section: 'contact', icon: Phone, label: 'Contacto' },
+];
+
 export function LotFichaOverlay({
   lot,
   media,
   project,
   logos,
   onClose,
+  onNavigate,
+  onContactOpen,
 }: LotFichaOverlayProps) {
   const [copied, setCopied] = useState(false);
 
   const fichaImage = media.find(
     (m) => m.purpose === 'ficha_furnished' || m.purpose === 'thumbnail'
   );
+  // For the desktop card preview, use ficha image or any available image
+  const previewImage = fichaImage ?? media.find((m) => m.type === 'image');
   const mobileBackground = media.find((m) => m.purpose === 'background_mobile');
   const desktopBackground = media.find((m) => m.purpose === 'background');
 
@@ -80,6 +96,16 @@ export function LotFichaOverlay({
     setTimeout(() => setCopied(false), 2000);
   }, []);
 
+  const handleNavClick = useCallback((section: 'home' | 'map' | 'location' | 'contact') => {
+    if (section === 'contact') {
+      if (onContactOpen) onContactOpen();
+      else handleWhatsApp();
+    } else {
+      onClose();
+      onNavigate?.(section);
+    }
+  }, [onClose, onNavigate, onContactOpen, handleWhatsApp]);
+
   const featureItems = features.slice(0, 3).map((text, i) => ({
     icon: FEATURE_ICONS[i] ?? Flame,
     text,
@@ -103,21 +129,22 @@ export function LotFichaOverlay({
           <div className="absolute inset-0 bg-black" />
         )}
 
-        {/* Close button */}
+        {/* Back button */}
         <button
           onClick={onClose}
-          className="absolute top-3 left-3 z-10 w-9 h-9 flex items-center justify-center glass-panel !rounded-full hover:bg-white/10 transition-colors outline-none"
-          aria-label="Cerrar"
+          className="absolute top-3 left-3 z-10 w-9 h-9 flex items-center justify-center lots-glass rounded-full hover:bg-black/50 transition-colors outline-none"
+          aria-label="Volver"
         >
-          <X className="w-4 h-4 text-white" />
+          <ChevronLeft className="w-4 h-4 text-white" />
         </button>
 
-        {/* Bottom panel */}
+        {/* Bottom panel + nav */}
         <div
           className="fixed bottom-0 left-0 right-0 z-10"
           style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         >
-          <div className="glass-panel !rounded-b-none px-3 pt-2 pb-2 text-white">
+          {/* Info card */}
+          <div className="lots-glass rounded-t-xl px-3 pt-2 pb-1.5 text-white">
             {/* Header */}
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-xs font-bold tracking-wide">
@@ -138,15 +165,15 @@ export function LotFichaOverlay({
             </div>
 
             {/* Dimensions */}
-            <div className="grid grid-cols-2 gap-1 mb-1">
-              <div className="bg-white/5 rounded-md p-1.5">
+            <div className="grid grid-cols-2 gap-px mb-1">
+              <div className="bg-white/5 rounded-l-md p-1.5">
                 <div className="flex items-center gap-1 text-white/60 text-[8px] mb-0.5">
                   <Ruler className="w-2.5 h-2.5" />
                   <span>Dimensiones</span>
                 </div>
                 <span className="font-medium text-[10px]">{dimensions}</span>
               </div>
-              <div className="bg-white/5 rounded-md p-1.5">
+              <div className="bg-white/5 rounded-r-md p-1.5 border-l border-white/10">
                 <div className="flex items-center gap-1 text-white/60 text-[8px] mb-0.5">
                   <Grid3X3 className="w-2.5 h-2.5" />
                   <span>Superficie</span>
@@ -168,11 +195,11 @@ export function LotFichaOverlay({
               ))}
             </div>
 
-            {/* Footer */}
+            {/* Footer: logo + contact */}
             <div className="flex items-center justify-between">
               {logos.length > 0 && (
                 <img
-                  src={logos[0].url!}
+                  src={logos[logos.length - 1].url!}
                   alt=""
                   className="h-4"
                 />
@@ -180,19 +207,19 @@ export function LotFichaOverlay({
               <div className="flex gap-1 ml-auto">
                 <button
                   onClick={handleEmail}
-                  className="w-6 h-6 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-md transition-colors outline-none"
+                  className="w-7 h-7 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-md transition-colors outline-none"
                 >
                   <Mail className="w-3 h-3" />
                 </button>
                 <button
                   onClick={handleWhatsApp}
-                  className="w-6 h-6 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-md transition-colors outline-none"
+                  className="w-7 h-7 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-md transition-colors outline-none"
                 >
                   <Phone className="w-3 h-3" />
                 </button>
                 <button
                   onClick={handleShare}
-                  className="w-6 h-6 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-md transition-colors outline-none"
+                  className="w-7 h-7 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-md transition-colors outline-none"
                 >
                   {copied ? (
                     <Check className="w-3 h-3 text-green-400" />
@@ -203,11 +230,26 @@ export function LotFichaOverlay({
               </div>
             </div>
           </div>
+
+          {/* Bottom nav bar */}
+          <nav className="h-14 lots-glass flex items-center justify-around px-2">
+            {NAV_ITEMS.map(({ section, icon: Icon, label }) => (
+              <button
+                key={section}
+                onClick={() => handleNavClick(section)}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 text-white/70 active:text-white transition-colors outline-none"
+                aria-label={label}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-[10px] font-medium">{label}</span>
+              </button>
+            ))}
+          </nav>
         </div>
       </div>
 
       {/* ==================== MOBILE LANDSCAPE ==================== */}
-      <div className="xl:hidden portrait:hidden fixed inset-0 z-50 bg-black">
+      <div className="xl:hidden portrait:hidden fixed inset-0 z-50 pointer-events-none">
         {(desktopBackground?.url || mobileBackground?.url) && (
           <img
             src={desktopBackground?.url ?? mobileBackground?.url}
@@ -215,18 +257,21 @@ export function LotFichaOverlay({
             className="absolute inset-0 w-full h-full object-cover"
           />
         )}
+        {!desktopBackground?.url && !mobileBackground?.url && (
+          <div className="absolute inset-0 bg-black" />
+        )}
 
         <button
           onClick={onClose}
-          className="absolute top-2 left-2 z-10 w-8 h-8 flex items-center justify-center glass-panel !rounded-full hover:bg-white/10 transition-colors outline-none"
-          aria-label="Cerrar"
+          className="absolute top-2 left-2 z-10 w-8 h-8 flex items-center justify-center lots-glass rounded-full hover:bg-black/50 transition-colors outline-none pointer-events-auto"
+          aria-label="Volver"
         >
-          <X className="w-3.5 h-3.5 text-white" />
+          <ChevronLeft className="w-3.5 h-3.5 text-white" />
         </button>
 
         {/* Side card */}
-        <div className="absolute left-[5%] w-[150px] md:w-[200px] top-10 bottom-3 overflow-y-auto">
-          <div className="glass-panel p-2 md:p-2.5 text-white">
+        <div className="absolute left-[5%] w-[150px] md:w-[200px] top-10 bottom-3 overflow-y-auto pointer-events-auto">
+          <div className="lots-glass rounded-2xl p-2 md:p-2.5 text-white">
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-[10px] md:text-xs font-bold tracking-wide">
                 LOTE {lot.label}
@@ -281,7 +326,7 @@ export function LotFichaOverlay({
 
             <div className="flex items-center justify-between">
               {logos.length > 0 && (
-                <img src={logos[0].url!} alt="" className="h-3.5 md:h-4" />
+                <img src={logos[logos.length - 1].url!} alt="" className="h-3.5 md:h-4" />
               )}
               <div className="flex gap-1 ml-auto">
                 <button
@@ -313,15 +358,27 @@ export function LotFichaOverlay({
       </div>
 
       {/* ==================== DESKTOP ==================== */}
-      <div className="hidden xl:block fixed inset-0 z-50 pointer-events-none">
-        {/* Click-away area */}
-        <div
-          className="absolute inset-0 pointer-events-auto"
+      <div className="hidden xl:block fixed inset-0 z-50 bg-black">
+        {/* Full background image of the lot */}
+        {(desktopBackground?.url || mobileBackground?.url) && (
+          <img
+            src={desktopBackground?.url ?? mobileBackground?.url}
+            alt={`Lote ${lot.label}`}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
+
+        {/* Back button */}
+        <button
           onClick={onClose}
-        />
+          className="absolute top-6 left-6 z-10 w-12 h-12 flex items-center justify-center lots-glass rounded-full hover:bg-black/50 transition-colors outline-none"
+          aria-label="Volver"
+        >
+          <ChevronLeft className="w-5 h-5 text-white" />
+        </button>
 
         {/* Card */}
-        <div className="absolute left-[10%] top-1/2 -translate-y-1/2 w-[420px] max-h-[90vh] overflow-y-auto glass-panel p-5 text-white pointer-events-auto">
+        <div className="absolute left-[10%] top-1/2 -translate-y-1/2 w-[420px] max-h-[90vh] overflow-y-auto lots-glass rounded-2xl p-5 text-white">
           {/* Header */}
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xl font-bold tracking-wide">
@@ -335,11 +392,11 @@ export function LotFichaOverlay({
           </div>
 
           {/* Preview image */}
-          {fichaImage?.url && (
-            <div className="rounded-lg overflow-hidden mb-3 h-28">
+          {previewImage?.url && (
+            <div className="rounded-xl overflow-hidden mb-3 h-28">
               <img
-                src={fichaImage.url}
-                alt={`Lote ${lot.label}`}
+                src={previewImage.url}
+                alt="Vista del desarrollo"
                 className="w-full h-full object-cover"
               />
             </div>
@@ -386,26 +443,26 @@ export function LotFichaOverlay({
           {/* Footer */}
           <div className="flex items-center justify-between">
             {logos.length > 0 && (
-              <img src={logos[0].url!} alt="" className="h-8" />
+              <img src={logos[logos.length - 1].url!} alt="" className="h-8" />
             )}
             <div className="flex gap-2 ml-auto">
               <button
                 onClick={handleEmail}
-                className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-lg transition-colors outline-none"
+                className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-xl transition-colors outline-none"
                 aria-label="Email"
               >
                 <Mail className="w-4 h-4" />
               </button>
               <button
                 onClick={handleWhatsApp}
-                className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-lg transition-colors outline-none"
+                className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-xl transition-colors outline-none"
                 aria-label="WhatsApp"
               >
                 <Phone className="w-4 h-4" />
               </button>
               <button
                 onClick={handleShare}
-                className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-lg transition-colors outline-none"
+                className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-xl transition-colors outline-none"
                 aria-label="Compartir"
               >
                 {copied ? (

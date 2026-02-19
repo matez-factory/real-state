@@ -66,8 +66,8 @@ export function TopNav({
         </button>
       )}
 
-      {/* Desktop + landscape — pill top-right */}
-      <div className="absolute top-2 right-2 md:top-4 md:right-4 xl:top-6 xl:right-6 z-40 hidden landscape:flex xl:flex items-center gap-2 xl:gap-3">
+      {/* Desktop + landscape — pill top-right (z-[55] to stay above ficha overlay z-50) */}
+      <div className="absolute top-2 right-2 md:top-4 md:right-4 xl:top-6 xl:right-6 z-[55] hidden landscape:flex xl:flex items-center gap-2 xl:gap-3">
         <nav className="h-8 md:h-10 xl:h-12 px-1 md:px-1.5 xl:px-2 lots-glass rounded-full flex items-center gap-0 md:gap-0.5 xl:gap-1">
           {NAV_ITEMS.map(({ section, icon: Icon, label }) => (
             <button

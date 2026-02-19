@@ -128,8 +128,11 @@ export function LotsHomePage({ data }: LotsHomePageProps) {
             activeSection={activeSection}
             onNavigate={handleNavigate}
             onContactOpen={() => setContactOpen(true)}
-            showBack={activeView === 'location'}
-            onBack={() => setActiveView('tour')}
+            showBack
+            onBack={activeView === 'location'
+              ? () => setActiveView('tour')
+              : () => router.push(`/p/${project.slug}`)
+            }
           />
         </>
       )}

@@ -4,7 +4,6 @@ import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ExplorerPageData, SiblingExplorerBundle } from '@/types/hierarchy.types';
 import { InteractiveSVG } from '@/components/svg/InteractiveSVG';
-import { STATUS_LABELS, STATUS_DOT_CLASSES } from '@/lib/constants/status';
 import { BrandingBadge } from './BrandingBadge';
 import { TopNav } from './TopNav';
 import { ContactModal } from './ContactModal';
@@ -53,13 +52,13 @@ export function LotsExplorerView({
   );
 
   const svgUrl = data.currentLayer?.svgOverlayUrl ?? project.svgOverlayUrl;
+  const svgMobileUrl = data.currentLayer?.svgOverlayMobileUrl;
   const backgroundUrl =
     media.find((m) => m.purpose === 'background' && m.type === 'image')?.url ??
     data.currentLayer?.backgroundImageUrl;
-
-  const availableCount = children.filter(
-    (c) => c.status === 'available'
-  ).length;
+  const backgroundMobileUrl =
+    media.find((m) => m.purpose === 'background_mobile' && m.type === 'image')?.url ??
+    data.currentLayer?.backgroundImageMobileUrl;
 
   // Lot click → overlay (no navigation)
   const entityConfigs = useMemo(
@@ -89,9 +88,24 @@ export function LotsExplorerView({
     );
   }, [project.slug, data.currentPath]);
 
-  const handleNavigate = (section: 'home' | 'map' | 'location' | 'contact') => {
-    if (section === 'home') {
+  // Navigate to parent path (tour layer) — not the splash
+  const parentPath = data.currentPath.slice(0, -1);
+  const goToParent = useCallback(() => {
+    if (parentPath.length > 0) {
+      router.push(`/p/${project.slug}/${parentPath.join('/')}`);
+    } else {
       router.push(`/p/${project.slug}`);
+    }
+  }, [router, project.slug, parentPath]);
+
+  const handleNavigate = (section: 'home' | 'map' | 'location' | 'contact') => {
+    // Close ficha if open
+    if (selectedLotId) {
+      setSelectedLotId(null);
+      history.pushState(null, '', `/p/${project.slug}/${data.currentPath.join('/')}`);
+    }
+    if (section === 'home') {
+      goToParent();
     } else if (section === 'map') {
       setActiveView('map');
     } else if (section === 'location') {
@@ -104,12 +118,14 @@ export function LotsExplorerView({
   return (
     <div className="relative h-screen bg-black overflow-hidden">
       {/* Content */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 portrait:scale-[1.3] landscape:scale-[1.15] xl:scale-100">
         {activeView === 'map' && svgUrl && (
           <InteractiveSVG
             svgUrl={svgUrl}
+            svgMobileUrl={svgMobileUrl}
             entities={entityConfigs}
             backgroundUrl={backgroundUrl}
+            backgroundMobileUrl={backgroundMobileUrl}
           />
         )}
         {activeView === 'map' && !svgUrl && (
@@ -120,30 +136,6 @@ export function LotsExplorerView({
         {activeView === 'location' && <LocationView project={project} />}
       </div>
 
-      {/* Legend (top-right, desktop only, behind ficha) */}
-      {activeView === 'map' && (
-        <div className="hidden sm:block absolute top-4 right-4 z-20 glass-panel px-4 py-3">
-          <div className="flex items-center gap-4 text-xs text-gray-400">
-            <span>
-              <span className="text-white font-semibold">
-                {availableCount}
-              </span>
-              /{children.length} disponibles
-            </span>
-            <div className="flex gap-3">
-              {(['available', 'reserved', 'sold'] as const).map((status) => (
-                <div key={status} className="flex items-center gap-1.5">
-                  <div
-                    className={`w-2 h-2 rounded-full ${STATUS_DOT_CLASSES[status]}`}
-                  />
-                  <span>{STATUS_LABELS[status]}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Branding badge */}
       <BrandingBadge project={project} logos={logos} />
 
@@ -152,8 +144,8 @@ export function LotsExplorerView({
         activeSection={activeSection}
         onNavigate={handleNavigate}
         onContactOpen={() => setContactOpen(true)}
-        showBack={activeView === 'location'}
-        onBack={() => setActiveView('map')}
+        showBack
+        onBack={activeView === 'location' ? () => setActiveView('map') : goToParent}
       />
 
       {/* Lot ficha overlay */}
@@ -164,6 +156,8 @@ export function LotsExplorerView({
           project={project}
           logos={logos}
           onClose={handleCloseFicha}
+          onNavigate={handleNavigate}
+          onContactOpen={() => setContactOpen(true)}
         />
       )}
 
