@@ -105,9 +105,19 @@ function getUnitStatus(floorNum: number, unitIdx: number): Status {
   return 'available';
 }
 
-function getUnitFeatures(area: number): string[] {
-  const baseFeatures = ['Aire acondicionado', 'Calefacción central', 'Portero eléctrico', 'Cochera'];
-  const premiumFeatures = ['Piso de porcelanato', 'Cocina equipada', 'Vestidor', 'Toilette'];
+function getUnitFeatures(area: number): { icon: string; text: string }[] {
+  const baseFeatures = [
+    { icon: 'wind', text: 'Aire acondicionado' },
+    { icon: 'thermometer', text: 'Calefacción central' },
+    { icon: 'lock', text: 'Portero eléctrico' },
+    { icon: 'car', text: 'Cochera' },
+  ];
+  const premiumFeatures = [
+    { icon: 'sofa', text: 'Piso de porcelanato' },
+    { icon: 'cooking-pot', text: 'Cocina equipada' },
+    { icon: 'sofa', text: 'Vestidor' },
+    { icon: 'shower-head', text: 'Toilette' },
+  ];
   return area >= 106
     ? [...baseFeatures, ...premiumFeatures]
     : [...baseFeatures, premiumFeatures[0]];

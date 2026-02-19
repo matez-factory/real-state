@@ -27,6 +27,10 @@ interface Spin360ViewerProps {
   renderNavigation?: (props: NavigationRenderProps) => React.ReactNode;
   /** Enable horizontal panorama scroll in portrait mode (default: false) */
   enablePanorama?: boolean;
+  /** SVG element ID for the tower hotspot (default: 'tower') */
+  hotspotTowerId?: string;
+  /** SVG element ID for the marker hotspot (default: 'marker') */
+  hotspotMarkerId?: string;
   /** Notifies parent when viewpoint changes */
   onViewpointChange?: (id: string) => void;
   /** Notifies parent when transition state changes */
@@ -43,6 +47,8 @@ export function Spin360Viewer({
   hideSvgOverlay,
   renderNavigation,
   enablePanorama = false,
+  hotspotTowerId,
+  hotspotMarkerId,
   onViewpointChange,
   onTransitionChange,
 }: Spin360ViewerProps) {
@@ -199,11 +205,14 @@ export function Spin360Viewer({
           svg.style.height = '100%';
         }
 
-        const hasNamedElements = !!svg.querySelector('#tower') || !!svg.querySelector('#marker');
+        const towerId = hotspotTowerId ?? 'tower';
+        const markerId = hotspotMarkerId ?? 'marker';
+        const tower = svg.querySelector(`#${CSS.escape(towerId)}`) as SVGElement | null;
+        const marker = svg.querySelector(`#${CSS.escape(markerId)}`) as SVGElement | null;
+        const hasNamedElements = !!tower || !!marker;
 
         if (hasNamedElements) {
-          // === Building SVGs — named elements (#tower, #marker) ===
-          const tower = svg.querySelector('#tower') as SVGElement | null;
+          // === Building SVGs — named elements ===
           if (tower) {
             if (isMobile) {
               tower.classList.add('hotspot-pulse');
@@ -214,7 +223,6 @@ export function Spin360Viewer({
             }
           }
 
-          const marker = svg.querySelector('#marker') as SVGElement | null;
           if (marker) {
             marker.style.fill = 'rgba(74, 144, 226, 0.7)';
             marker.style.stroke = '#ffffff';
@@ -317,7 +325,7 @@ export function Spin360Viewer({
       cancelled = true;
       container.innerHTML = '';
     };
-  }, [currentViewpoint, phase, handleEnterBuilding, spinSvgs, portraitPanorama]);
+  }, [currentViewpoint, phase, handleEnterBuilding, spinSvgs, portraitPanorama, hotspotTowerId, hotspotMarkerId]);
 
   // Center panorama scroll on mount / viewpoint change
   useEffect(() => {

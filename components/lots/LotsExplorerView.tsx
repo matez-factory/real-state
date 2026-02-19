@@ -47,7 +47,7 @@ export function LotsExplorerView({
   );
 
   const logos = useMemo(
-    () => media.filter((m) => m.purpose === 'logo'),
+    () => media.filter((m) => m.purpose === 'logo' || m.purpose === 'logo_developer'),
     [media]
   );
 

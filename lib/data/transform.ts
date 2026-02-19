@@ -2,6 +2,7 @@ import {
   Project,
   Layer,
   Media,
+  FeatureItem,
   ExplorerPageData,
   SiblingExplorerBundle,
   EntityStatus,
@@ -59,6 +60,8 @@ export interface RawProject {
   has_state_management: boolean;
   has_layers_gallery: boolean;
   has_zoom_in: boolean;
+  hotspot_tower_id: string | null;
+  hotspot_marker_id: string | null;
 }
 
 export interface RawLayer {
@@ -95,7 +98,7 @@ export interface RawLayer {
 
   // Characteristics
   is_corner: boolean | null;
-  features: string[] | null;
+  features: FeatureItem[] | null;
 
   // Unit type
   unit_type_id: string | null;
@@ -166,6 +169,8 @@ export function transformProject(raw: RawProject): Project {
     hasStateManagement: raw.has_state_management ?? true,
     hasLayersGallery: raw.has_layers_gallery ?? false,
     hasZoomIn: raw.has_zoom_in ?? false,
+    hotspotTowerId: raw.hotspot_tower_id ?? 'tower',
+    hotspotMarkerId: raw.hotspot_marker_id ?? 'marker',
   };
 }
 
@@ -206,7 +211,7 @@ export function transformLayer(raw: RawLayer): Layer {
 
     // Characteristics
     isCorner: raw.is_corner ?? (props.is_corner as boolean | undefined) ?? undefined,
-    features: raw.features ?? (props.features as string[] | undefined) ?? undefined,
+    features: raw.features ?? (props.features as FeatureItem[] | undefined) ?? undefined,
 
     // Unit type
     unitTypeId: raw.unit_type_id || undefined,
@@ -291,11 +296,11 @@ export function buildExplorerPageData(
   const isLeafLevel = children.length > 0 && !hasGrandchildren;
 
   // Get media for the current layer (or project-level if at root)
-  // Logos (project-level, purpose='logo') are always included so BrandingBadge/ContactModal work at any depth
+  // Logos (project-level, purpose='logo'/'logo_developer') are always included so BrandingBadge/ContactModal work at any depth
   const media = allMedia
     .filter((m) =>
       (currentLayer ? m.layerId === currentLayer.id : !m.layerId) ||
-      (!m.layerId && m.purpose === 'logo')
+      (!m.layerId && (m.purpose === 'logo' || m.purpose === 'logo_developer'))
     )
     .sort((a, b) => a.sortOrder - b.sortOrder);
 

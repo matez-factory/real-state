@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ExplorerPageData, Layer } from '@/types/hierarchy.types';
 import { Breadcrumb } from '@/components/navigation/Breadcrumb';
 import { STATUS_LABELS, STATUS_CLASSES } from '@/lib/constants/status';
+import { getFeatureIcon } from '@/lib/constants/feature-icons';
 import { buttonStyles } from '@/lib/styles/button';
 import { Gallery } from '@/components/views/Gallery';
 
@@ -134,12 +135,15 @@ export function UnitPage({ data }: UnitPageProps) {
                     Balcón
                   </li>
                 )}
-                {features && features.map((feature, idx) => (
-                  <li key={idx} className="flex items-center text-sm text-gray-300">
-                    <span className="text-green-400 mr-2">✓</span>
-                    {feature}
-                  </li>
-                ))}
+                {features && features.map((f, idx) => {
+                  const Icon = getFeatureIcon(f.icon);
+                  return (
+                    <li key={idx} className="flex items-center text-sm text-gray-300">
+                      <Icon className="w-4 h-4 text-green-400 mr-2" />
+                      {f.text}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
 

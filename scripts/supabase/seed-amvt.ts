@@ -70,9 +70,9 @@ const LOTS: LotDef[] = [
 ];
 
 const PROJECT_FEATURES = [
-  'Factibilidad de conexión a los servicios de gas natural, cloacas y electricidad',
-  'Acceso por calle pavimentada',
-  'Posibilidad de financiación con crédito hipotecario hasta el 50% del valor del lote (sujeto a verificación crediticia)',
+  { icon: 'flame', text: 'Factibilidad de conexión a los servicios de gas natural, cloacas y electricidad' },
+  { icon: 'car', text: 'Acceso por calle pavimentada' },
+  { icon: 'dollar-sign', text: 'Posibilidad de financiación con crédito hipotecario hasta el 50% del valor del lote (sujeto a verificación crediticia)' },
 ];
 
 // ============================================================

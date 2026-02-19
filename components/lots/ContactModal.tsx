@@ -37,7 +37,7 @@ export function ContactModal({ project, logos, open, onClose }: ContactModalProp
   const iconClass =
     'w-8 h-8 xl:w-11 xl:h-11 flex items-center justify-center bg-white/10 rounded-full flex-shrink-0';
 
-  const developerLogo = logos.length > 1 ? logos[logos.length - 1] : logos[0];
+  const developerLogo = logos.find(l => l.purpose === 'logo_developer') ?? logos[0];
 
   return (
     <div

@@ -14,7 +14,7 @@ export function LotsSplashPage({ data }: LotsSplashPageProps) {
   const { project, media, children } = data;
 
   const logos = useMemo(
-    () => media.filter((m) => m.purpose === 'logo'),
+    () => media.filter((m) => m.purpose === 'logo' || m.purpose === 'logo_developer'),
     [media]
   );
 

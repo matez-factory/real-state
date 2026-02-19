@@ -310,12 +310,12 @@ async function run() {
   console.log('\n=== Logos ===');
 
   const logos = [
-    { file: 'logo-amvt.svg', title: 'Logo AMVT' },
-    { file: 'logo-proin.svg', title: 'Logo PRO IN' },
+    { file: 'logo-amvt.svg', title: 'Logo AMVT', purpose: 'logo' },
+    { file: 'logo-proin.svg', title: 'Logo PRO IN', purpose: 'logo_developer' },
   ];
 
   for (let i = 0; i < logos.length; i++) {
-    const { file, title } = logos[i];
+    const { file, title, purpose } = logos[i];
     const localPath = path.join(CONTENT_BASE, 'branding', file);
     const storagePath = `amvt/branding/${file}`;
 
@@ -324,7 +324,7 @@ async function run() {
       projectId: project.id,
       layerId: null,
       type: 'image',
-      purpose: 'logo',
+      purpose,
       storagePath,
       url,
       title,

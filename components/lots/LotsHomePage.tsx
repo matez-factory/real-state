@@ -31,7 +31,7 @@ export function LotsHomePage({ data }: LotsHomePageProps) {
   }, []);
 
   const logos = useMemo(
-    () => media.filter((m) => m.purpose === 'logo'),
+    () => media.filter((m) => m.purpose === 'logo' || m.purpose === 'logo_developer'),
     [media]
   );
 
@@ -80,6 +80,8 @@ export function LotsHomePage({ data }: LotsHomePageProps) {
             hideControls
             enablePanorama
             hideSvgOverlay={false}
+            hotspotTowerId={project.hotspotTowerId}
+            hotspotMarkerId={project.hotspotMarkerId}
             onViewpointChange={setCurrentViewpoint}
             onTransitionChange={handleTransitionChange}
             onEnterBuilding={() => {

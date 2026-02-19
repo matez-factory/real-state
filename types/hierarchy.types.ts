@@ -21,9 +21,19 @@ export type MediaPurpose =
   | 'intro'
   | 'brochure'
   | 'logo'
+  | 'logo_developer'
   | 'hotspot'
   | 'layers_gallery'
   | 'exterior_360';
+
+// ============================================================
+// Feature items
+// ============================================================
+
+export interface FeatureItem {
+  icon: string;   // Lucide icon name (e.g. 'flame', 'car', 'dollar-sign')
+  text: string;
+}
 
 // ============================================================
 // Core entities
@@ -70,6 +80,10 @@ export interface Project {
   hasStateManagement: boolean;
   hasLayersGallery: boolean;
   hasZoomIn: boolean;
+
+  // SVG hotspot element IDs
+  hotspotTowerId?: string;
+  hotspotMarkerId?: string;
 }
 
 export interface Layer {
@@ -106,7 +120,7 @@ export interface Layer {
 
   // Characteristics
   isCorner?: boolean;
-  features?: string[];
+  features?: FeatureItem[];
 
   // Unit type
   unitTypeId?: string;

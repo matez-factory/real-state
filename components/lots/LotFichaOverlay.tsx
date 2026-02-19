@@ -5,9 +5,6 @@ import {
   ChevronLeft,
   Ruler,
   Grid3X3,
-  Flame,
-  Car,
-  DollarSign,
   Mail,
   Phone,
   Share2,
@@ -18,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Layer, Media, Project } from '@/types/hierarchy.types';
 import { STATUS_LABELS } from '@/lib/constants/status';
+import { getFeatureIcon } from '@/lib/constants/feature-icons';
 
 interface LotFichaOverlayProps {
   lot: Layer;
@@ -35,8 +33,6 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
   sold: 'bg-red-500/80 text-white',
   not_available: 'bg-gray-500/80 text-white',
 };
-
-const FEATURE_ICONS = [Flame, Car, DollarSign];
 
 const NAV_ITEMS: { section: 'home' | 'map' | 'location' | 'contact'; icon: typeof Home; label: string }[] = [
   { section: 'home', icon: Home, label: 'Inicio' },
@@ -106,9 +102,9 @@ export function LotFichaOverlay({
     }
   }, [onClose, onNavigate, onContactOpen, handleWhatsApp]);
 
-  const featureItems = features.slice(0, 3).map((text, i) => ({
-    icon: FEATURE_ICONS[i] ?? Flame,
-    text,
+  const featureItems = features.slice(0, 3).map((f) => ({
+    icon: getFeatureIcon(f.icon),
+    text: f.text,
   }));
 
   const statusLabel = STATUS_LABELS[lot.status]?.toUpperCase() ?? lot.status;
@@ -199,7 +195,7 @@ export function LotFichaOverlay({
             <div className="flex items-center justify-between">
               {logos.length > 0 && (
                 <img
-                  src={logos[logos.length - 1].url!}
+                  src={(logos.find(l => l.purpose === 'logo_developer') ?? logos[logos.length - 1]).url!}
                   alt=""
                   className="h-4"
                 />
@@ -326,7 +322,7 @@ export function LotFichaOverlay({
 
             <div className="flex items-center justify-between">
               {logos.length > 0 && (
-                <img src={logos[logos.length - 1].url!} alt="" className="h-3.5 md:h-4" />
+                <img src={(logos.find(l => l.purpose === 'logo_developer') ?? logos[logos.length - 1]).url!} alt="" className="h-3.5 md:h-4" />
               )}
               <div className="flex gap-1 ml-auto">
                 <button
@@ -443,7 +439,7 @@ export function LotFichaOverlay({
           {/* Footer */}
           <div className="flex items-center justify-between">
             {logos.length > 0 && (
-              <img src={logos[logos.length - 1].url!} alt="" className="h-8" />
+              <img src={(logos.find(l => l.purpose === 'logo_developer') ?? logos[logos.length - 1]).url!} alt="" className="h-8" />
             )}
             <div className="flex gap-2 ml-auto">
               <button

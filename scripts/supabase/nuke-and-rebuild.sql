@@ -82,6 +82,7 @@ CREATE TYPE media_purpose AS ENUM (
   'intro',
   'brochure',
   'logo',
+  'logo_developer',
   'hotspot',
   'layers_gallery',
   'exterior_360'
@@ -145,6 +146,8 @@ CREATE TABLE projects (
   has_state_management BOOLEAN DEFAULT true,
   has_layers_gallery BOOLEAN DEFAULT false,
   has_zoom_in BOOLEAN DEFAULT false,
+  hotspot_tower_id TEXT DEFAULT 'tower',
+  hotspot_marker_id TEXT DEFAULT 'marker',
   tour_points_count INT DEFAULT 4,
   topview_mode topview_mode DEFAULT 'single',
 
@@ -263,7 +266,7 @@ CREATE TABLE layers (
 
   -- Características
   is_corner BOOLEAN DEFAULT false,
-  features TEXT[],
+  features JSONB DEFAULT '[]',
 
   -- Unit type ref (edificios)
   unit_type_id UUID REFERENCES unit_types(id) ON DELETE SET NULL,
