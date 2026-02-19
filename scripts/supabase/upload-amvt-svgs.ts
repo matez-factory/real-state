@@ -27,7 +27,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const BUCKET = 'project-media';
 
 // Source content directory
-const CONTENT_BASE = path.resolve(__dirname, '../../../lot-visualizer/public');
+const CONTENT_BASE = '/home/martin/Documentos/Programación/TRABAJOS/Matez Factory/Map-project/lot-visualizer/public';
 
 // ============================================================
 // Helpers
@@ -88,12 +88,25 @@ async function run() {
     process.exit(1);
   }
 
+  // Get tour layer
+  const { data: tour } = await supabase
+    .from('layers')
+    .select('id, slug')
+    .eq('project_id', project.id)
+    .eq('slug', 'tour')
+    .single();
+
+  if (!tour) {
+    console.error('Tour layer not found. Run db:seed-amvt first.');
+    process.exit(1);
+  }
+
   // Get zone layer
   const { data: zone } = await supabase
     .from('layers')
     .select('id, slug')
     .eq('project_id', project.id)
-    .eq('depth', 0)
+    .eq('slug', 'lotes')
     .single();
 
   if (!zone) {
@@ -153,7 +166,7 @@ async function run() {
 
     const { error: mediaError } = await supabase.from('media').insert({
       project_id: project.id,
-      layer_id: null,
+      layer_id: tour.id,
       type: 'svg',
       purpose: 'hotspot',
       storage_path: storagePath,

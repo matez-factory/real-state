@@ -130,12 +130,20 @@ function getUnitFeatures(area: number): { icon: string; text: string }[] {
 async function seed() {
   console.log('Starting Aurora seed...\n');
 
-  // Clear existing data
-  console.log('Clearing existing data...');
-  await supabase.from('media').delete().not('id', 'is', null);
-  await supabase.from('layers').delete().not('id', 'is', null);
-  await supabase.from('unit_types').delete().not('id', 'is', null);
-  await supabase.from('projects').delete().not('id', 'is', null);
+  // Clear existing Aurora data (preserve other projects)
+  console.log('Clearing existing Aurora data...');
+  const { data: existing } = await supabase
+    .from('projects')
+    .select('id')
+    .eq('slug', 'aurora')
+    .single();
+
+  if (existing) {
+    await supabase.from('media').delete().eq('project_id', existing.id);
+    await supabase.from('layers').delete().eq('project_id', existing.id);
+    await supabase.from('unit_types').delete().eq('project_id', existing.id);
+    await supabase.from('projects').delete().eq('id', existing.id);
+  }
   console.log('  Done\n');
 
   // Create project
@@ -151,7 +159,6 @@ async function seed() {
       scale: 'medium',
       layer_labels: ['Nivel', 'Departamento'],
       max_depth: 2,
-      svg_overlay_url: null,
       city: 'Buenos Aires',
       state: 'CABA',
       country: 'Argentina',

@@ -296,11 +296,13 @@ export function buildExplorerPageData(
   const isLeafLevel = children.length > 0 && !hasGrandchildren;
 
   // Get media for the current layer (or project-level if at root)
-  // Logos (project-level, purpose='logo'/'logo_developer') are always included so BrandingBadge/ContactModal work at any depth
+  // At project root (no currentLayer): include ALL project-level media (splash bg, logos)
+  // At any layer: include layer-specific media + project-level logos only
+  const includeAllProjectMedia = !currentLayer;
   const media = allMedia
     .filter((m) =>
       (currentLayer ? m.layerId === currentLayer.id : !m.layerId) ||
-      (!m.layerId && (m.purpose === 'logo' || m.purpose === 'logo_developer'))
+      (!m.layerId && (includeAllProjectMedia || m.purpose === 'logo' || m.purpose === 'logo_developer'))
     )
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
@@ -318,6 +320,11 @@ export function buildExplorerPageData(
         .filter((l) => l.parentId === currentLayer.parentId)
         .sort((a, b) => a.sortOrder - b.sortOrder)
     : [];
+
+  // Root layers (depth 0) — always available for navigation (Inicio / Atrás)
+  const rootLayers = allLayers
+    .filter((l) => l.parentId === null)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   // Build breadcrumbs
   const breadcrumbs: BreadcrumbItem[] = [
@@ -342,6 +349,7 @@ export function buildExplorerPageData(
     isLeafLevel,
     currentPath: layerSlugs,
     siblings,
+    rootLayers,
   };
 }
 

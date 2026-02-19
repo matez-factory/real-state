@@ -227,6 +227,7 @@ export interface ExplorerPageData {
   isLeafLevel: boolean;           // true if children have no further children
   currentPath: string[];          // layer slugs leading to current position
   siblings: Layer[];              // layers sharing the same parent (includes current)
+  rootLayers: Layer[];            // all depth-0 layers sorted by sortOrder (for navigation)
 }
 
 export interface SiblingExplorerBundle {

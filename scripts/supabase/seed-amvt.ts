@@ -151,7 +151,6 @@ async function seed() {
       scale: 'small',
       layer_labels: ['Zona', 'Lote'],
       max_depth: 2,
-      svg_overlay_url: null,
       city: 'Venado Tuerto',
       state: 'Santa Fe',
       country: 'Argentina',
@@ -176,7 +175,30 @@ async function seed() {
   if (projectError) throw projectError;
   console.log(`  Created: ${project.name}\n`);
 
-  // Create zone layer (depth 0)
+  // Create tour layer (depth 0) — holds 360 panorama + hotspots + transitions
+  console.log('Creating tour layer...');
+  const { data: tour, error: tourError } = await supabase
+    .from('layers')
+    .insert({
+      project_id: project.id,
+      parent_id: null,
+      type: 'tour',
+      depth: 0,
+      sort_order: 0,
+      slug: 'tour',
+      name: 'Tour 360',
+      label: 'Tour',
+      svg_element_id: null,
+      status: 'available',
+      properties: {},
+    })
+    .select()
+    .single();
+
+  if (tourError) throw tourError;
+  console.log(`  Created tour: ${tour.name} (id: ${tour.id})\n`);
+
+  // Create zone layer (depth 0) — holds topview map + lot children
   console.log('Creating zone "Lotes"...');
   const { data: zone, error: zoneError } = await supabase
     .from('layers')
@@ -185,7 +207,7 @@ async function seed() {
       parent_id: null,
       type: 'zone',
       depth: 0,
-      sort_order: 0,
+      sort_order: 1,
       slug: 'lotes',
       name: 'Lotes',
       label: 'Lotes',

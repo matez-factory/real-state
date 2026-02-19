@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ExplorerPageData } from '@/types/hierarchy.types';
+import { getHomeUrl, getBackUrl } from '@/lib/navigation';
 import { Spin360Viewer } from '@/components/video/Spin360Viewer';
 import { MobileHint } from '@/components/shared/MobileHint';
 import { BrandingBadge } from './BrandingBadge';
@@ -48,16 +49,35 @@ export function LotsHomePage({ data }: LotsHomePageProps) {
     return result;
   }, [media]);
 
-  // Navigate to first child (zone)
-  const firstChildSlug = children[0]?.slug;
+  // Navigate to zone/map: first child if available, otherwise next sibling
+  const mapTarget = useMemo(() => {
+    if (children.length > 0) {
+      return `/p/${project.slug}/${data.currentPath.join('/')}/${children[0].slug}`;
+    }
+    // No children — find next sibling (e.g. "lotes" sibling of "tour")
+    const currentId = data.currentLayer?.id;
+    const nextSibling = data.siblings.find((s) => s.id !== currentId);
+    if (nextSibling) {
+      return `/p/${project.slug}/${nextSibling.slug}`;
+    }
+    return null;
+  }, [project.slug, data.currentPath, children, data.currentLayer, data.siblings]);
+
+  const homeUrl = getHomeUrl(data);
+  const backUrl = getBackUrl(data);
+
+  // Is this layer the first root layer? (i.e. IS the home)
+  const isHomeLayer = data.currentLayer?.id === data.rootLayers[0]?.id;
 
   const handleNavigate = (section: 'home' | 'map' | 'location' | 'contact') => {
     if (section === 'home') {
-      setActiveView('tour');
-    } else if (section === 'map') {
-      if (firstChildSlug) {
-        router.push(`/p/${project.slug}/${data.currentPath.join('/')}/${firstChildSlug}`);
+      if (isHomeLayer) {
+        setActiveView('tour'); // Already home — just switch view
+      } else {
+        router.push(homeUrl);
       }
+    } else if (section === 'map') {
+      if (mapTarget) router.push(mapTarget);
     } else if (section === 'location') {
       setActiveView('location');
     }
@@ -85,7 +105,7 @@ export function LotsHomePage({ data }: LotsHomePageProps) {
             onViewpointChange={setCurrentViewpoint}
             onTransitionChange={handleTransitionChange}
             onEnterBuilding={() => {
-              if (firstChildSlug) router.push(`/p/${project.slug}/${data.currentPath.join('/')}/${firstChildSlug}`);
+              if (mapTarget) router.push(mapTarget);
             }}
             renderNavigation={({ onPrev, onNext, isTransitioning }) => {
               if (isTransitioning) return null;
@@ -133,7 +153,7 @@ export function LotsHomePage({ data }: LotsHomePageProps) {
             showBack
             onBack={activeView === 'location'
               ? () => setActiveView('tour')
-              : () => router.push(`/p/${project.slug}`)
+              : () => router.push(backUrl)
             }
           />
         </>

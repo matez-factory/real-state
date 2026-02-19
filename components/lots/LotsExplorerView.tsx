@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ExplorerPageData, SiblingExplorerBundle } from '@/types/hierarchy.types';
+import { getHomeUrl, getBackUrl } from '@/lib/navigation';
 import { InteractiveSVG } from '@/components/svg/InteractiveSVG';
 import { BrandingBadge } from './BrandingBadge';
 import { TopNav } from './TopNav';
@@ -88,15 +89,8 @@ export function LotsExplorerView({
     );
   }, [project.slug, data.currentPath]);
 
-  // Navigate to parent path (tour layer) — not the splash
-  const parentPath = data.currentPath.slice(0, -1);
-  const goToParent = useCallback(() => {
-    if (parentPath.length > 0) {
-      router.push(`/p/${project.slug}/${parentPath.join('/')}`);
-    } else {
-      router.push(`/p/${project.slug}`);
-    }
-  }, [router, project.slug, parentPath]);
+  const homeUrl = getHomeUrl(data);
+  const backUrl = getBackUrl(data);
 
   const handleNavigate = (section: 'home' | 'map' | 'location' | 'contact') => {
     // Close ficha if open
@@ -105,7 +99,7 @@ export function LotsExplorerView({
       history.pushState(null, '', `/p/${project.slug}/${data.currentPath.join('/')}`);
     }
     if (section === 'home') {
-      goToParent();
+      router.push(homeUrl);
     } else if (section === 'map') {
       setActiveView('map');
     } else if (section === 'location') {
@@ -145,7 +139,7 @@ export function LotsExplorerView({
         onNavigate={handleNavigate}
         onContactOpen={() => setContactOpen(true)}
         showBack
-        onBack={activeView === 'location' ? () => setActiveView('map') : goToParent}
+        onBack={activeView === 'location' ? () => setActiveView('map') : () => router.push(backUrl)}
       />
 
       {/* Lot ficha overlay */}

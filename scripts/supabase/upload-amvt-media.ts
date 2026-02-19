@@ -32,7 +32,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const BUCKET = 'project-media';
 
 // Source content directory
-const CONTENT_BASE = path.resolve(__dirname, '../../../lot-visualizer/public');
+const CONTENT_BASE = '/home/martin/Documentos/Programación/TRABAJOS/Matez Factory/Map-project/lot-visualizer/public';
 
 // ============================================================
 // Helpers
@@ -139,12 +139,25 @@ async function run() {
   await supabase.from('media').delete().eq('project_id', project.id);
   console.log('  Done\n');
 
-  // Get zone and lot layers
+  // Get tour layer
+  const { data: tour } = await supabase
+    .from('layers')
+    .select('id, slug')
+    .eq('project_id', project.id)
+    .eq('slug', 'tour')
+    .single();
+
+  if (!tour) {
+    console.error('Tour layer not found. Run db:seed-amvt first.');
+    process.exit(1);
+  }
+
+  // Get zone layer
   const { data: zone } = await supabase
     .from('layers')
     .select('id, slug')
     .eq('project_id', project.id)
-    .eq('depth', 0)
+    .eq('slug', 'lotes')
     .single();
 
   const { data: lots } = await supabase
@@ -165,9 +178,29 @@ async function run() {
   let count = 0;
 
   // ==========================================
-  // 1. Tour stop images (project-level, exterior_360)
+  // 0. Project-level background (splash screen)
   // ==========================================
-  console.log('=== Tour stop images ===');
+  console.log('=== Splash background ===');
+  {
+    const localPath = path.join(CONTENT_BASE, 'tour', 'stop-01.webp');
+    const storagePath = 'amvt/splash/background.webp';
+    const url = await uploadFile(localPath, storagePath);
+    if (url && await createMediaRow({
+      projectId: project.id,
+      layerId: null,
+      type: 'image',
+      purpose: 'background',
+      storagePath,
+      url,
+      title: 'Splash background',
+      sortOrder: 0,
+    })) count++;
+  }
+
+  // ==========================================
+  // 1. Tour stop images (on tour layer, exterior_360)
+  // ==========================================
+  console.log('\n=== Tour stop images ===');
 
   for (let i = 1; i <= 4; i++) {
     const stopId = `stop-${String(i).padStart(2, '0')}`;
@@ -177,7 +210,7 @@ async function run() {
     const url = await uploadFile(localPath, storagePath);
     if (url && await createMediaRow({
       projectId: project.id,
-      layerId: null,
+      layerId: tour.id,
       type: 'image',
       purpose: 'gallery',
       storagePath,
@@ -189,7 +222,7 @@ async function run() {
   }
 
   // ==========================================
-  // 2. Transition videos (project-level)
+  // 2. Transition videos (on tour layer)
   // ==========================================
   console.log('\n=== Transition videos ===');
 
@@ -212,7 +245,7 @@ async function run() {
     const url = await uploadFile(localPath, storagePath);
     if (url && await createMediaRow({
       projectId: project.id,
-      layerId: null,
+      layerId: tour.id,
       type: 'video',
       purpose: 'transition',
       storagePath,
