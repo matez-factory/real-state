@@ -73,7 +73,7 @@ export function ProjectHomePage({ data }: ProjectHomePageProps) {
       {/* View content */}
       <div className="absolute inset-0">
         {currentView === 'exterior' && (
-          <Spin360Viewer media={data.media} spinSvgs={spinSvgs} onEnterBuilding={enterBuilding} preloadOnEntrance={preloadUrls} />
+          <Spin360Viewer media={data.media} spinSvgs={spinSvgs} onEnterBuilding={enterBuilding} preloadOnEntrance={preloadUrls} enterLabel={data.project.type === 'lots' ? 'Explorar lotes' : 'Explorar niveles'} />
         )}
         {currentView === 'videos' && <AerialVideoGallery media={aerialVideos} />}
       </div>
@@ -98,7 +98,7 @@ export function ProjectHomePage({ data }: ProjectHomePageProps) {
             onClick={enterBuilding}
             className="px-5 py-2 rounded-lg text-sm font-medium transition-colors bg-white/10 text-white/80 hover:bg-white/20 hover:text-white"
           >
-            Niveles
+            {data.project.type === 'lots' ? 'Lotes' : 'Niveles'}
           </button>
           {aerialVideos.length > 0 && (
             <button

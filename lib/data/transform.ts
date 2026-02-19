@@ -291,9 +291,11 @@ export function buildExplorerPageData(
   const isLeafLevel = children.length > 0 && !hasGrandchildren;
 
   // Get media for the current layer (or project-level if at root)
+  // Logos (project-level, purpose='logo') are always included so BrandingBadge/ContactModal work at any depth
   const media = allMedia
     .filter((m) =>
-      currentLayer ? m.layerId === currentLayer.id : !m.layerId
+      (currentLayer ? m.layerId === currentLayer.id : !m.layerId) ||
+      (!m.layerId && m.purpose === 'logo')
     )
     .sort((a, b) => a.sortOrder - b.sortOrder);
 

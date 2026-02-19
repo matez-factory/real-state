@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { RotateDeviceOverlay } from "@/components/shared/RotateDeviceOverlay";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,6 +19,7 @@ export default function RootLayout({
           Saltar al contenido principal
         </a>
         {children}
+        <RotateDeviceOverlay />
       </body>
     </html>
   );

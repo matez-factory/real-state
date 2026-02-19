@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+@custom-variant landscape (@media (orientation: landscape));
+@custom-variant portrait (@media (orientation: portrait));
+
 @theme {
   /* Brand colors */
   --color-brand-primary: #3b82f6;
@@ -42,6 +45,27 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 1rem;
 }
+
+/* Lots glass: matches lot-visualizer design system (lighter, heavier blur) */
+.lots-glass {
+  background: rgba(0, 0, 0, 0.40);
+  backdrop-filter: blur(52px);
+  box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.15), 2px 2px 3px 1px rgba(0, 0, 0, 0.05);
+}
+
+/* Hide scrollbar for panorama */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Animations */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.animate-fade-in { animation: fadeIn 0.5s ease-out; }
+
+@keyframes hotspotPulse {
+  0%, 100% { fill: rgba(255,255,255,0.1); stroke: rgba(255,255,255,0.4); }
+  50% { fill: rgba(255,255,255,0.2); stroke: rgba(255,255,255,0.7); }
+}
+.hotspot-pulse { animation: hotspotPulse 2s ease-in-out infinite; stroke-width: 2px; }
 
 .skip-nav:focus {
   position: fixed;

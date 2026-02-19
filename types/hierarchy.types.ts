@@ -6,7 +6,7 @@ export type EntityStatus = 'available' | 'reserved' | 'sold' | 'not_available';
 export type ProjectType = 'lots' | 'building' | 'masterplan';
 export type ProjectStatus = 'draft' | 'active' | 'archived';
 export type ProjectScale = 'small' | 'medium' | 'large';
-export type LayerType = 'neighborhood' | 'block' | 'zone' | 'tower' | 'floor' | 'lot' | 'unit';
+export type LayerType = 'neighborhood' | 'block' | 'zone' | 'tower' | 'floor' | 'lot' | 'unit' | 'tour';
 export type MediaType = 'image' | 'video' | 'svg' | 'document';
 export type MediaPurpose =
   | 'background'
@@ -219,4 +219,9 @@ export interface SiblingExplorerBundle {
   current: ExplorerPageData;
   siblingDataMap: Record<string, ExplorerPageData>; // layerId → ExplorerPageData
   siblingOrder: string[];                           // ordered layer IDs (by sortOrder)
+}
+
+export interface LotsProjectBundle {
+  home: ExplorerPageData;   // project root: project + zones + project-level media
+  zone: ExplorerPageData;   // zone detail: zone + lots + lot media
 }

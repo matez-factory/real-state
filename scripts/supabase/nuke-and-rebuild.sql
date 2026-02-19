@@ -64,7 +64,8 @@ CREATE TYPE layer_type AS ENUM (
   'tower',         -- torre/edificio
   'floor',         -- piso
   'lot',           -- lote individual
-  'unit'           -- unidad/departamento
+  'unit',          -- unidad/departamento
+  'tour'           -- tour 360
 );
 CREATE TYPE entity_status AS ENUM ('available', 'reserved', 'sold', 'not_available');
 CREATE TYPE media_type AS ENUM ('image', 'video', 'svg', 'document');
