@@ -1,0 +1,120 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useState, useMemo, useCallback } from 'react';
+import { ExplorerPageData } from '@/types/hierarchy.types';
+import { VideoPlayer } from '@/components/video/VideoPlayer';
+
+interface BuildingSplashPageProps {
+  data: ExplorerPageData;
+}
+
+export function BuildingSplashPage({ data }: BuildingSplashPageProps) {
+  const router = useRouter();
+  const { project, media, children, childrenMedia } = data;
+
+  const [introPlaying, setIntroPlaying] = useState(false);
+  const [introVisible, setIntroVisible] = useState(false);
+
+  const logos = useMemo(
+    () => media.filter((m) => m.purpose === 'logo' || m.purpose === 'logo_developer'),
+    [media]
+  );
+
+  const backgroundUrl = useMemo(
+    () => media.find((m) => m.purpose === 'background' && m.type === 'image')?.url,
+    [media]
+  );
+
+  const firstChildSlug = children[0]?.slug;
+
+  // Find intro video from tour child's media (transition with from_viewpoint: "intro")
+  const introVideoUrl = useMemo(() => {
+    if (!project.hasVideoIntro) return null;
+    const tourChild = children.find((c) => c.type === 'tour') ?? children[0];
+    if (!tourChild) return null;
+    const tourMedia = childrenMedia[tourChild.id] ?? [];
+    const intro = tourMedia.find((m) => {
+      if (m.type !== 'video' || m.purpose !== 'transition') return false;
+      const meta = m.metadata as Record<string, unknown>;
+      return meta?.from_viewpoint === 'intro';
+    });
+    return intro?.url ?? null;
+  }, [project.hasVideoIntro, children, childrenMedia]);
+
+  const handleEnter = useCallback(() => {
+    if (introVideoUrl) {
+      setIntroPlaying(true);
+    } else if (firstChildSlug) {
+      router.push(`/p/${project.slug}/${firstChildSlug}`);
+    }
+  }, [introVideoUrl, firstChildSlug, project.slug, router]);
+
+  const handleIntroEnd = useCallback(() => {
+    if (firstChildSlug) {
+      router.push(`/p/${project.slug}/${firstChildSlug}`);
+    }
+  }, [firstChildSlug, project.slug, router]);
+
+  return (
+    <div className="relative h-screen bg-black overflow-hidden">
+      {backgroundUrl && (
+        <img
+          src={backgroundUrl}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      )}
+
+      {/* Landing overlay — hidden once intro video starts playing */}
+      {!introVisible && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/20" />
+
+          <div className="relative z-10 w-[90%] max-w-[230px] xl:max-w-[320px] text-center text-white">
+            <div className="glass-panel rounded-xl px-4 py-4 xl:px-6 xl:py-6 flex flex-col items-center">
+              <h1 className="text-lg xl:text-[26px] font-medium tracking-wide mb-2 xl:mb-4 text-white">
+                {project.name}
+              </h1>
+
+              {logos.length > 0 && (
+                <div className="flex items-center justify-center gap-4 xl:gap-6 mb-3 xl:mb-5">
+                  {logos.map((logo) => (
+                    <img
+                      key={logo.id}
+                      src={logo.url!}
+                      alt={logo.altText || ''}
+                      className="h-8 xl:h-12 w-auto"
+                    />
+                  ))}
+                </div>
+              )}
+
+              <button
+                onClick={handleEnter}
+                className="w-fit px-6 py-1.5 xl:px-8 xl:py-2 bg-white/10 hover:bg-white/20 text-white font-medium text-sm xl:text-base rounded-full transition-colors duration-200 outline-none"
+              >
+                Entrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Intro video — starts behind (z-1), promoted above (z-50) once playing */}
+      {introPlaying && introVideoUrl && (
+        <div className="absolute inset-0" style={{ zIndex: introVisible ? 50 : 1 }}>
+          <VideoPlayer
+            src={introVideoUrl}
+            autoPlay
+            muted
+            controls={false}
+            onPlaying={() => setIntroVisible(true)}
+            onEnded={handleIntroEnd}
+            className="w-full h-full"
+          />
+        </div>
+      )}
+    </div>
+  );
+}

@@ -11,14 +11,8 @@ interface TopNavProps {
   onContactOpen: () => void;
   showBack?: boolean;
   onBack?: () => void;
+  mapLabel?: string;
 }
-
-const NAV_ITEMS: { section: Section; icon: typeof Home; label: string }[] = [
-  { section: 'home', icon: Home, label: 'Inicio' },
-  { section: 'map', icon: Map, label: 'Mapa' },
-  { section: 'location', icon: MapPin, label: 'Ubicaci\u00f3n' },
-  { section: 'contact', icon: Phone, label: 'Contacto' },
-];
 
 export function TopNav({
   activeSection,
@@ -26,7 +20,14 @@ export function TopNav({
   onContactOpen,
   showBack,
   onBack,
+  mapLabel = 'Mapa',
 }: TopNavProps) {
+  const NAV_ITEMS: { section: Section; icon: typeof Home; label: string }[] = [
+    { section: 'home', icon: Home, label: 'Inicio' },
+    { section: 'map', icon: Map, label: mapLabel },
+    { section: 'location', icon: MapPin, label: 'Ubicaci\u00f3n' },
+    { section: 'contact', icon: Phone, label: 'Contacto' },
+  ];
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -82,7 +83,7 @@ export function TopNav({
           ))}
           <button
             onClick={toggleFullscreen}
-            className="flex items-center justify-center gap-2 w-7 h-7 md:w-8 md:h-8 xl:w-auto xl:h-9 xl:px-4 rounded-full text-sm font-medium transition-colors text-white/90 hover:text-white hover:bg-white/10 outline-none"
+            className="flex items-center justify-center w-7 h-7 md:w-8 md:h-8 xl:w-9 xl:h-9 rounded-full text-sm font-medium transition-colors text-white/90 hover:text-white hover:bg-white/10 outline-none"
             aria-label={isFullscreen ? 'Salir pantalla completa' : 'Pantalla completa'}
           >
             {isFullscreen ? (
@@ -90,9 +91,6 @@ export function TopNav({
             ) : (
               <Maximize2 className="w-3.5 h-3.5 md:w-4 md:h-4 xl:w-4 xl:h-4" />
             )}
-            <span className="hidden xl:inline">
-              {isFullscreen ? 'Salir' : 'Pantalla completa'}
-            </span>
           </button>
         </nav>
       </div>

@@ -29,13 +29,16 @@ export function SiblingNavigator({ siblings, currentLayerId, label, onSelect }: 
   }, [currentLayerId]);
 
   return (
-    <aside className="hidden lg:flex w-28 glass-panel rounded-none rounded-l-2xl ml-0 flex-col border-l-0">
+    <aside className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 z-40 flex-col bg-black/50 backdrop-blur-md rounded-l-xl max-h-[75vh] overflow-hidden">
       <div className="px-3 py-3 border-b border-white/10">
         <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
           {label}es
         </span>
       </div>
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-0.5 [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+      >
         <div className="flex flex-col py-1">
           {sorted.map((sibling) => {
             const isCurrent = sibling.id === currentLayerId;
@@ -45,13 +48,17 @@ export function SiblingNavigator({ siblings, currentLayerId, label, onSelect }: 
                 ref={isCurrent ? activeRef : undefined}
                 onClick={() => onSelect(sibling)}
                 className={`
-                  flex items-center gap-2 px-3 py-2 text-sm transition-colors outline-none
+                  flex items-center gap-2 px-3 py-2 text-sm transition-colors outline-none relative
                   ${isCurrent
-                    ? 'bg-white/15 text-white font-semibold border-l-2 border-white'
+                    ? 'bg-white/15 text-white font-semibold'
                     : 'text-gray-400 hover:bg-white/10 hover:text-white'
                   }
                 `}
               >
+                {/* Active accent bar */}
+                {isCurrent && (
+                  <div className="absolute left-0 top-1 bottom-1 w-[3px] bg-sky-400 rounded-r-full" />
+                )}
                 <div className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT_CLASSES[sibling.status]}`} />
                 <span className="truncate">{sibling.label}</span>
               </button>

@@ -17,6 +17,8 @@ interface InteractiveSVGProps {
   entities: SVGEntityConfig[];
   backgroundUrl?: string;
   backgroundMobileUrl?: string;
+  /** 'lots' preserves original style; 'building' uses status-based colors + circular badges */
+  variant?: 'lots' | 'building';
 }
 
 // Status dot colors matching original lot-visualizer
@@ -27,6 +29,26 @@ const STATUS_DOT_COLORS: Record<EntityStatus, string> = {
   not_available: '#9ca3af',
 };
 
+// Building variant: status-based zone fills
+const STATUS_FILL: Record<EntityStatus, string> = {
+  available: 'rgba(34, 197, 94, 0.12)',
+  reserved: 'rgba(234, 179, 8, 0.12)',
+  sold: 'rgba(239, 68, 68, 0.12)',
+  not_available: 'rgba(156, 163, 175, 0.08)',
+};
+const STATUS_FILL_HOVER: Record<EntityStatus, string> = {
+  available: 'rgba(34, 197, 94, 0.30)',
+  reserved: 'rgba(234, 179, 8, 0.30)',
+  sold: 'rgba(239, 68, 68, 0.30)',
+  not_available: 'rgba(156, 163, 175, 0.18)',
+};
+const STATUS_STROKE: Record<EntityStatus, string> = {
+  available: 'rgba(34, 197, 94, 0.6)',
+  reserved: 'rgba(234, 179, 8, 0.6)',
+  sold: 'rgba(239, 68, 68, 0.6)',
+  not_available: 'rgba(156, 163, 175, 0.3)',
+};
+
 type ListenerEntry = { element: SVGElement; event: string; handler: EventListener };
 
 export function InteractiveSVG({
@@ -35,7 +57,9 @@ export function InteractiveSVG({
   entities,
   backgroundUrl,
   backgroundMobileUrl,
+  variant = 'lots',
 }: InteractiveSVGProps) {
+  const isBuilding = variant === 'building';
   const containerRef = useRef<HTMLDivElement>(null);
   const listenersRef = useRef<ListenerEntry[]>([]);
 
@@ -91,7 +115,7 @@ export function InteractiveSVG({
     allPaths.forEach((el) => {
       const element = el as SVGElement;
       if (!element.id || !entities.find(e => e.id === element.id)) {
-        element.style.opacity = '0.3';
+        element.style.opacity = isBuilding ? '0.12' : '0.3';
       }
     });
 
@@ -105,11 +129,18 @@ export function InteractiveSVG({
         return;
       }
 
-      // Original style: transparent fill, white hover
-      element.style.fill = 'transparent';
+      // Style based on variant
+      if (isBuilding) {
+        element.style.fill = STATUS_FILL[entity.status];
+        element.style.stroke = STATUS_STROKE[entity.status];
+        element.style.strokeWidth = '2';
+      } else {
+        element.style.fill = 'transparent';
+      }
       element.style.cursor = 'pointer';
       element.style.pointerEvents = 'all';
-      element.style.transition = 'fill 0.2s ease';
+      element.style.transition = 'fill 0.2s ease, stroke 0.2s ease';
+      element.style.opacity = '1';
 
       // Keyboard accessibility
       element.setAttribute('tabindex', '0');
@@ -117,18 +148,18 @@ export function InteractiveSVG({
       element.setAttribute('aria-label', `${entity.label} — ${STATUS_LABELS[entity.status]}`);
       element.style.outline = 'none';
 
-      // We'll store the label bgRect reference for hover darkening
-      let bgRect: SVGRectElement | null = null;
+      // Label reference for hover effects
+      let bgShape: SVGElement | null = null;
       let scaleGroup: SVGGElement | null = null;
 
       const onEnter = () => {
-        element.style.fill = 'rgba(255, 255, 255, 0.15)';
-        if (bgRect) bgRect.setAttribute('fill', 'rgba(0, 0, 0, 0.75)');
-        if (scaleGroup) scaleGroup.style.transform = 'scale(1.2)';
+        element.style.fill = isBuilding ? STATUS_FILL_HOVER[entity.status] : 'rgba(255, 255, 255, 0.15)';
+        if (bgShape) bgShape.setAttribute('fill', 'rgba(0, 0, 0, 0.85)');
+        if (scaleGroup) scaleGroup.style.transform = 'scale(1.15)';
       };
       const onLeave = () => {
-        element.style.fill = 'transparent';
-        if (bgRect) bgRect.setAttribute('fill', 'rgba(0, 0, 0, 0.45)');
+        element.style.fill = isBuilding ? STATUS_FILL[entity.status] : 'transparent';
+        if (bgShape) bgShape.setAttribute('fill', 'rgba(0, 0, 0, 0.7)');
         if (scaleGroup) scaleGroup.style.transform = 'scale(1)';
       };
       const onClick = (e: Event) => {
@@ -136,13 +167,13 @@ export function InteractiveSVG({
         entity.onClick();
       };
       const onFocus = () => {
-        element.style.fill = 'rgba(255, 255, 255, 0.15)';
-        if (bgRect) bgRect.setAttribute('fill', 'rgba(0, 0, 0, 0.75)');
-        if (scaleGroup) scaleGroup.style.transform = 'scale(1.2)';
+        element.style.fill = isBuilding ? STATUS_FILL_HOVER[entity.status] : 'rgba(255, 255, 255, 0.15)';
+        if (bgShape) bgShape.setAttribute('fill', 'rgba(0, 0, 0, 0.85)');
+        if (scaleGroup) scaleGroup.style.transform = 'scale(1.15)';
       };
       const onBlur = () => {
-        element.style.fill = 'transparent';
-        if (bgRect) bgRect.setAttribute('fill', 'rgba(0, 0, 0, 0.45)');
+        element.style.fill = isBuilding ? STATUS_FILL[entity.status] : 'transparent';
+        if (bgShape) bgShape.setAttribute('fill', 'rgba(0, 0, 0, 0.7)');
         if (scaleGroup) scaleGroup.style.transform = 'scale(1)';
       };
       const onKeyDown = (e: Event) => {
@@ -170,53 +201,83 @@ export function InteractiveSVG({
         { element, event: 'keydown', handler: onKeyDown },
       );
 
-      // Add label — matching original SVGLotOverlay style (pill with dot inside)
+      // Add label
       try {
         const bbox = (element as SVGGraphicsElement).getBBox();
         const centerX = bbox.x + bbox.width / 2;
         const centerY = bbox.y + bbox.height / 2;
 
-        // Outer group positioned at center
         const posGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         posGroup.setAttribute('transform', `translate(${centerX}, ${centerY})`);
         posGroup.setAttribute('pointer-events', 'none');
 
-        // Inner group for scale transform (centered at 0,0)
         scaleGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         scaleGroup.style.transition = 'transform 0.2s ease';
         scaleGroup.style.transformOrigin = '0 0';
 
-        // Pill background
-        const textWidth = entity.label.length * 8 + 28;
-        bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        bgRect.setAttribute('x', String(-textWidth / 2));
-        bgRect.setAttribute('y', '-13');
-        bgRect.setAttribute('width', String(textWidth));
-        bgRect.setAttribute('height', '26');
-        bgRect.setAttribute('rx', '13');
-        bgRect.setAttribute('fill', 'rgba(0, 0, 0, 0.45)');
-        bgRect.style.transition = 'fill 0.2s ease';
+        if (isBuilding) {
+          // Building: circular badge with status dot
+          const radius = 18;
+          const bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          bgCircle.setAttribute('cx', '0');
+          bgCircle.setAttribute('cy', '0');
+          bgCircle.setAttribute('r', String(radius));
+          bgCircle.setAttribute('fill', 'rgba(0, 0, 0, 0.7)');
+          bgCircle.style.transition = 'fill 0.2s ease';
+          bgShape = bgCircle;
 
-        // Status indicator dot (inside pill, left side)
-        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        dot.setAttribute('cx', String(-textWidth / 2 + 13));
-        dot.setAttribute('cy', '0');
-        dot.setAttribute('r', '4');
-        dot.setAttribute('fill', STATUS_DOT_COLORS[entity.status]);
+          const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          dot.setAttribute('cx', '-6');
+          dot.setAttribute('cy', '0');
+          dot.setAttribute('r', '3.5');
+          dot.setAttribute('fill', STATUS_DOT_COLORS[entity.status]);
 
-        // Label text (after dot)
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', String(-textWidth / 2 + 23));
-        text.setAttribute('y', '4');
-        text.setAttribute('font-family', 'system-ui, sans-serif');
-        text.setAttribute('font-size', '12');
-        text.setAttribute('font-weight', '600');
-        text.setAttribute('fill', '#ffffff');
-        text.textContent = entity.label;
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', '4');
+          text.setAttribute('y', '5');
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('font-family', 'system-ui, sans-serif');
+          text.setAttribute('font-size', '14');
+          text.setAttribute('font-weight', '700');
+          text.setAttribute('fill', '#ffffff');
+          text.textContent = entity.label;
 
-        scaleGroup.appendChild(bgRect);
-        scaleGroup.appendChild(dot);
-        scaleGroup.appendChild(text);
+          scaleGroup.appendChild(bgCircle);
+          scaleGroup.appendChild(dot);
+          scaleGroup.appendChild(text);
+        } else {
+          // Lots: pill with dot inside (original style)
+          const textWidth = entity.label.length * 8 + 28;
+          const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          bgRect.setAttribute('x', String(-textWidth / 2));
+          bgRect.setAttribute('y', '-13');
+          bgRect.setAttribute('width', String(textWidth));
+          bgRect.setAttribute('height', '26');
+          bgRect.setAttribute('rx', '13');
+          bgRect.setAttribute('fill', 'rgba(0, 0, 0, 0.45)');
+          bgRect.style.transition = 'fill 0.2s ease';
+          bgShape = bgRect;
+
+          const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          dot.setAttribute('cx', String(-textWidth / 2 + 13));
+          dot.setAttribute('cy', '0');
+          dot.setAttribute('r', '4');
+          dot.setAttribute('fill', STATUS_DOT_COLORS[entity.status]);
+
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', String(-textWidth / 2 + 23));
+          text.setAttribute('y', '4');
+          text.setAttribute('font-family', 'system-ui, sans-serif');
+          text.setAttribute('font-size', '12');
+          text.setAttribute('font-weight', '600');
+          text.setAttribute('fill', '#ffffff');
+          text.textContent = entity.label;
+
+          scaleGroup.appendChild(bgRect);
+          scaleGroup.appendChild(dot);
+          scaleGroup.appendChild(text);
+        }
+
         posGroup.appendChild(scaleGroup);
         svg.appendChild(posGroup);
       } catch (err) {
@@ -225,7 +286,7 @@ export function InteractiveSVG({
     });
 
     listenersRef.current = listeners;
-  }, [resolveAssets, entities]);
+  }, [resolveAssets, entities, isBuilding]);
 
   useEffect(() => {
     const container = containerRef.current;

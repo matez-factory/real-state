@@ -3,30 +3,36 @@
 import { useMemo, useCallback, useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ExplorerPageData, Layer, SiblingExplorerBundle } from '@/types/hierarchy.types';
+import { getHomeUrl, getBackUrl } from '@/lib/navigation';
 import { InteractiveSVG } from '@/components/svg/InteractiveSVG';
-import { Breadcrumb } from '@/components/navigation/Breadcrumb';
 import { SiblingNavigator } from '@/components/navigation/SiblingNavigator';
-import { STATUS_LABELS, STATUS_DOT_CLASSES } from '@/lib/constants/status';
-import { buttonStyles } from '@/lib/styles/button';
+import { BrandingBadge } from '@/components/lots/BrandingBadge';
+import { TopNav } from '@/components/lots/TopNav';
+import { ContactModal } from '@/components/lots/ContactModal';
+import { LocationView } from '@/components/lots/LocationView';
+import { STATUS_DOT_CLASSES } from '@/lib/constants/status';
 
 interface ExplorerViewProps {
   data: ExplorerPageData;
   siblingBundle?: SiblingExplorerBundle;
 }
 
+type ActiveView = 'map' | 'location';
+
 export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
   const router = useRouter();
-  // Ref keeps entityConfigs stable across router context changes
   const routerRef = useRef(router);
   routerRef.current = router;
 
   const [activeLayerId, setActiveLayerId] = useState(data.currentLayer?.id ?? null);
   const [mobileSiblingsOpen, setMobileSiblingsOpen] = useState(false);
+  const [activeView, setActiveView] = useState<ActiveView>('map');
+  const [contactOpen, setContactOpen] = useState(false);
+  const mapScrollRef = useRef<HTMLDivElement>(null);
 
-  // Sync with server on full page navigation
   useEffect(() => { setActiveLayerId(data.currentLayer?.id ?? null); }, [data]);
 
-  // Preload all sibling SVGs + images into browser cache on mount
+  // Preload all sibling SVGs + images into browser cache
   useEffect(() => {
     if (!siblingBundle) return;
     for (const d of Object.values(siblingBundle.siblingDataMap)) {
@@ -37,18 +43,32 @@ export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
     }
   }, [siblingBundle]);
 
-  // Use sibling data from bundle if available, otherwise server data
+  // Center horizontal scroll in portrait after floor switch
+  useEffect(() => {
+    const el = mapScrollRef.current;
+    if (!el) return;
+    const timer = setTimeout(() => {
+      if (el.scrollWidth > el.clientWidth) {
+        el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [activeLayerId]);
+
   const activeData: ExplorerPageData =
     (siblingBundle && activeLayerId ? siblingBundle.siblingDataMap[activeLayerId] : null) ?? data;
 
-  const { project, currentLayer, children, breadcrumbs, currentPath, siblings } = activeData;
+  const { project, currentLayer, children, currentPath, siblings, media } = activeData;
   const basePath = `/p/${project.slug}${currentPath.length > 0 ? '/' + currentPath.join('/') : ''}`;
   const svgUrl = currentLayer?.svgOverlayUrl ?? project.svgOverlayUrl;
   const currentLabel = project.layerLabels[currentLayer?.depth ?? -1] ?? '';
   const showSiblings = siblings.length > 1 && currentLayer != null;
   const backgroundUrl = activeData.media.find((m) => m.purpose === 'background' && m.type === 'image')?.url ?? currentLayer?.backgroundImageUrl;
-  const availableCount = children.filter((c) => c.status === 'available').length;
-  const title = currentLayer ? currentLayer.name : project.name;
+
+  const logos = useMemo(
+    () => media.filter((m) => m.purpose === 'logo' || m.purpose === 'logo_developer'),
+    [media]
+  );
 
   const entityConfigs = useMemo(
     () =>
@@ -61,7 +81,6 @@ export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
     [children, basePath]
   );
 
-  // Switch floors client-side (data from bundle, SVG from browser cache)
   const handleSiblingSelect = useCallback((sibling: Layer) => {
     if (sibling.id === activeLayerId) return;
     if (siblingBundle?.siblingDataMap[sibling.id]) {
@@ -72,85 +91,103 @@ export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
       const path = [...currentPath.slice(0, -1), sibling.slug];
       router.push(`/p/${project.slug}/${path.join('/')}`);
     }
+    setMobileSiblingsOpen(false);
   }, [activeLayerId, siblingBundle, currentPath, project.slug, router]);
 
+  const homeUrl = getHomeUrl(data);
+  // Back from building floor → tour (avoids redirect loop with zone wrapper)
+  const backUrl = project.type === 'building' ? homeUrl : getBackUrl(data);
+
+  const handleNavigate = (section: 'home' | 'map' | 'location' | 'contact') => {
+    if (section === 'home') {
+      router.push(homeUrl);
+    } else if (section === 'map') {
+      setActiveView('map');
+    } else if (section === 'location') {
+      setActiveView('location');
+    }
+  };
+
+  const activeSection = activeView === 'location' ? 'location' as const : 'map' as const;
+
   return (
-    <div className="relative flex h-screen bg-black overflow-hidden">
-      <main id="main-content" className="flex-1 relative">
-        {/* key forces fresh InteractiveSVG per floor (SVG loads from cache) */}
-        <div key={activeLayerId} className="absolute inset-0">
-          {svgUrl ? (
-            <InteractiveSVG svgUrl={svgUrl} entities={entityConfigs} backgroundUrl={backgroundUrl} />
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-500">
-              No hay mapa disponible para este nivel
-            </div>
-          )}
-        </div>
-
-        {/* Floating glass breadcrumb + title (top-left) */}
-        <div className="absolute top-4 left-4 z-20 glass-panel px-4 py-3 max-w-[70%]">
-          {breadcrumbs.length > 1 && <Breadcrumb items={breadcrumbs} />}
-          <h1 className="text-lg font-semibold text-white mt-1">{title}</h1>
-        </div>
-
-        {/* Floating glass legend (top-right) */}
-        <div className="hidden sm:block absolute top-4 right-4 z-20 glass-panel px-4 py-3">
-          <div className="flex items-center gap-4 text-xs text-gray-400">
-            <span>
-              <span className="text-white font-semibold">{availableCount}</span>/{children.length} disponibles
-            </span>
-            <div className="flex gap-3">
-              {(['available', 'reserved', 'sold'] as const).map((status) => (
-                <div key={status} className="flex items-center gap-1.5">
-                  <div className={`w-2 h-2 rounded-full ${STATUS_DOT_CLASSES[status]}`} />
-                  <span>{STATUS_LABELS[status]}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Floating back button (bottom-left) */}
-        {currentLayer && (
-          <div className="absolute bottom-4 left-4 z-20">
-            <button
-              onClick={() => router.back()}
-              className={`glass-panel px-4 py-2 text-sm ${buttonStyles('ghost', 'sm')}`}
+    <div className="relative h-screen bg-black overflow-hidden">
+      {/* Content */}
+      <div className="absolute inset-0">
+        {activeView === 'map' && (
+          <main className="relative w-full h-full">
+            {/* Scrollable SVG area — portrait scrolls horizontally, others clip */}
+            <div
+              ref={mapScrollRef}
+              className="absolute inset-0 portrait:overflow-x-auto portrait:overflow-y-hidden landscape:overflow-hidden xl:overflow-hidden"
             >
-              ← Volver
-            </button>
-          </div>
-        )}
+              <div className="relative h-full w-full portrait:w-[170vw] xl:w-full">
+                {/* Persistent background — prevents black flash during floor switches */}
+                {backgroundUrl && (
+                  <img
+                    src={backgroundUrl}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                )}
+                {/* SVG overlay — reloads internally when props change (no key remount) */}
+                {svgUrl ? (
+                  <InteractiveSVG
+                    svgUrl={svgUrl}
+                    entities={entityConfigs}
+                    backgroundUrl={backgroundUrl}
+                    variant="building"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    No hay mapa disponible para este nivel
+                  </div>
+                )}
+              </div>
+            </div>
 
-        {/* Mobile siblings toggle (bottom-right) */}
-        {showSiblings && (
-          <div className="absolute bottom-4 right-4 z-20 lg:hidden">
-            <button
-              onClick={() => setMobileSiblingsOpen((o) => !o)}
-              className={`glass-panel px-4 py-2 text-sm ${buttonStyles('ghost', 'sm')}`}
-            >
-              {currentLabel}es ↑
-            </button>
-          </div>
+            {/* Mobile siblings toggle — above portrait bottom nav */}
+            {showSiblings && (
+              <div className="absolute bottom-20 right-4 z-[55] lg:hidden landscape:bottom-4">
+                <button
+                  onClick={() => setMobileSiblingsOpen((o) => !o)}
+                  className="lots-glass px-4 py-2 text-sm text-white/90 hover:text-white rounded-full transition-colors outline-none"
+                >
+                  {currentLabel}es ↑
+                </button>
+              </div>
+            )}
+          </main>
         )}
-      </main>
+        {activeView === 'location' && <LocationView project={project} />}
+      </div>
+
+      {/* Chrome — always visible */}
+      <BrandingBadge project={project} logos={logos} />
+      <TopNav
+        activeSection={activeSection}
+        onNavigate={handleNavigate}
+        onContactOpen={() => setContactOpen(true)}
+        mapLabel="Niveles"
+        showBack
+        onBack={activeView === 'location' ? () => setActiveView('map') : () => router.push(backUrl)}
+      />
 
       {/* Desktop sibling navigator */}
-      {showSiblings && currentLayer && (
+      {activeView === 'map' && showSiblings && currentLayer && (
         <SiblingNavigator
           siblings={siblings}
-          currentLayerId={currentLayer.id}
+          currentLayerId={activeLayerId ?? currentLayer.id}
           label={currentLabel}
           onSelect={handleSiblingSelect}
         />
       )}
 
-      {/* Mobile sibling overlay */}
-      {showSiblings && mobileSiblingsOpen && (
-        <div className="lg:hidden absolute inset-0 z-30 flex flex-col justify-end">
+      {/* Mobile sibling bottom sheet — mb-16 in portrait clears bottom nav */}
+      {mobileSiblingsOpen && showSiblings && (
+        <div className="lg:hidden fixed inset-0 z-[55] flex flex-col justify-end">
           <div className="flex-1" onClick={() => setMobileSiblingsOpen(false)} />
-          <div className="glass-panel rounded-t-2xl rounded-b-none max-h-[60vh] overflow-y-auto mx-2 mb-2">
+          <div className="bg-black/70 backdrop-blur-md rounded-t-2xl max-h-[60vh] overflow-y-auto mx-2 mb-16 landscape:mb-2">
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
               <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                 {currentLabel}es
@@ -165,17 +202,14 @@ export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
             </div>
             <div className="flex flex-col py-1">
               {[...siblings].reverse().map((sibling) => {
-                const isCurrent = sibling.id === currentLayer?.id;
+                const isCurrent = sibling.id === (activeLayerId ?? currentLayer?.id);
                 return (
                   <button
                     key={sibling.id}
-                    onClick={() => {
-                      handleSiblingSelect(sibling);
-                      setMobileSiblingsOpen(false);
-                    }}
+                    onClick={() => handleSiblingSelect(sibling)}
                     className={`flex items-center gap-2 px-4 py-3 text-sm transition-colors outline-none ${
                       isCurrent
-                        ? 'bg-white/15 text-white font-semibold border-l-2 border-white'
+                        ? 'bg-white/15 text-white font-semibold border-l-2 border-sky-400'
                         : 'text-gray-400 hover:bg-white/10 hover:text-white'
                     }`}
                   >
@@ -188,6 +222,14 @@ export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
           </div>
         </div>
       )}
+
+      {/* Contact modal */}
+      <ContactModal
+        project={project}
+        logos={logos}
+        open={contactOpen}
+        onClose={() => setContactOpen(false)}
+      />
     </div>
   );
 }

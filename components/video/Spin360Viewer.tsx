@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Media } from '@/types/hierarchy.types';
 import { VideoPlayer } from './VideoPlayer';
 import { useIsMobilePortrait } from '@/hooks/useIsMobilePortrait';
@@ -37,7 +37,11 @@ interface Spin360ViewerProps {
   onTransitionChange?: (isTransitioning: boolean) => void;
 }
 
-export function Spin360Viewer({
+export interface Spin360ViewerRef {
+  enterBuilding: () => void;
+}
+
+export const Spin360Viewer = forwardRef<Spin360ViewerRef, Spin360ViewerProps>(function Spin360Viewer({
   media,
   spinSvgs,
   onEnterBuilding,
@@ -51,7 +55,7 @@ export function Spin360Viewer({
   hotspotMarkerId,
   onViewpointChange,
   onTransitionChange,
-}: Spin360ViewerProps) {
+}: Spin360ViewerProps, ref: React.Ref<Spin360ViewerRef>) {
   // Derive viewpoint order dynamically from SVG hotspot media
   const viewpointOrder = useMemo(() => {
     return media
@@ -165,6 +169,10 @@ export function Spin360Viewer({
     }
   }, [currentViewpoint, findEntranceVideo, onEnterBuilding, preloadOnEntrance]);
 
+  useImperativeHandle(ref, () => ({
+    enterBuilding: handleEnterBuilding,
+  }), [handleEnterBuilding]);
+
   // Load and inject SVG overlay for current viewpoint
   // Copied from lot-visualizer TourHotspots.tsx
   useEffect(() => {
@@ -251,7 +259,10 @@ export function Spin360Viewer({
             marker.appendChild(animate);
           }
         } else {
-          // === Lots SVGs — copied from TourHotspots.tsx ===
+          // === Generic SVGs (lots + building tour) ===
+
+          // Remove decorative circles (e.g. marker dots in building SVGs)
+          svg.querySelectorAll('circle').forEach((c) => c.remove());
 
           // Inject pulse animation style directly into the SVG (mobile)
           if (isMobile) {
@@ -275,42 +286,42 @@ export function Spin360Viewer({
             svg.insertBefore(style, svg.firstChild);
           }
 
-          const paths = svg.querySelectorAll('path');
+          const shapes = svg.querySelectorAll<SVGElement>('path, polygon, polyline, rect, ellipse');
 
-          paths.forEach((path) => {
-            path.style.cursor = 'pointer';
-            path.style.transition = 'fill 0.2s ease, stroke 0.2s ease';
+          shapes.forEach((shape) => {
+            shape.style.cursor = 'pointer';
+            shape.style.transition = 'fill 0.2s ease, stroke 0.2s ease';
 
             if (isMobile) {
-              path.classList.add('hotspot-pulse');
+              shape.classList.add('hotspot-pulse');
             } else {
-              path.style.fill = 'transparent';
-              path.style.stroke = 'transparent';
+              shape.style.fill = 'transparent';
+              shape.style.stroke = 'transparent';
             }
 
             if (!isMobile) {
-              path.addEventListener('mouseenter', () => {
-                paths.forEach((pp) => {
-                  pp.style.fill = 'rgba(255, 255, 255, 0.15)';
-                  pp.style.stroke = 'rgba(255, 255, 255, 0.6)';
+              shape.addEventListener('mouseenter', () => {
+                shapes.forEach((s) => {
+                  s.style.fill = 'rgba(255, 255, 255, 0.15)';
+                  s.style.stroke = 'rgba(255, 255, 255, 0.6)';
                 });
                 setTooltip((prev) => ({ ...prev, visible: true }));
               });
 
-              path.addEventListener('mouseleave', () => {
-                paths.forEach((pp) => {
-                  pp.style.fill = 'transparent';
-                  pp.style.stroke = 'transparent';
+              shape.addEventListener('mouseleave', () => {
+                shapes.forEach((s) => {
+                  s.style.fill = 'transparent';
+                  s.style.stroke = 'transparent';
                 });
                 setTooltip((prev) => ({ ...prev, visible: false }));
               });
 
-              path.addEventListener('mousemove', (e) => {
+              shape.addEventListener('mousemove', (e) => {
                 setTooltip({ visible: true, x: e.clientX, y: e.clientY });
               });
             }
 
-            path.addEventListener('click', (e) => {
+            shape.addEventListener('click', (e) => {
               e.stopPropagation();
               handleEnterBuilding();
             });
@@ -415,15 +426,15 @@ export function Spin360Viewer({
 
   const showOverlay = phase === 'idle' || !videoPlaying;
 
-  // SVG container — copied from TourHotspots.tsx
-  // pointer-events-none on container, [&_path]:pointer-events-auto on paths
+  // SVG container — pointer-events-none on container, auto on all SVG shape elements
+  const shapePointerEvents = '[&_path]:pointer-events-auto [&_polygon]:pointer-events-auto [&_polyline]:pointer-events-auto [&_rect]:pointer-events-auto [&_ellipse]:pointer-events-auto';
   const svgOverlay = showOverlay && !entranceVideoPlaying && !hideSvgOverlay && (
     <div
       ref={svgContainerRef}
       className={
         portraitPanorama
-          ? 'absolute top-0 left-0 w-full h-full z-20 pointer-events-none [&_path]:pointer-events-auto'
-          : 'absolute inset-0 z-20 pointer-events-none [&_path]:pointer-events-auto'
+          ? `absolute top-0 left-0 w-full h-full z-20 pointer-events-none ${shapePointerEvents}`
+          : `absolute inset-0 z-20 pointer-events-none ${shapePointerEvents}`
       }
     />
   );
@@ -581,4 +592,4 @@ export function Spin360Viewer({
       )}
     </div>
   );
-}
+});

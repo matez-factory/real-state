@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getExplorerPageData } from '@/lib/data/repository';
 import { getProjectSlugsAdmin } from '@/lib/data/repository-admin';
-import { ProjectHomePage } from '@/components/views/ProjectHomePage';
+import { BuildingSplashPage } from '@/components/views/BuildingSplashPage';
 import { LotsSplashPage } from '@/components/lots/LotsSplashPage';
 
 interface ProjectPageProps {
@@ -22,7 +22,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     return <LotsSplashPage data={data} />;
   }
 
-  return <ProjectHomePage data={data} />;
+  return <BuildingSplashPage data={data} />;
 }
 
 export async function generateStaticParams() {

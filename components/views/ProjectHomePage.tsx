@@ -1,35 +1,45 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ExplorerPageData } from '@/types/hierarchy.types';
-import { Spin360Viewer } from '@/components/video/Spin360Viewer';
-import { AerialVideoGallery } from '@/components/video/AerialVideoGallery';
+import { getHomeUrl, getBackUrl } from '@/lib/navigation';
+import { Spin360Viewer, Spin360ViewerRef } from '@/components/video/Spin360Viewer';
+import { MobileHint } from '@/components/shared/MobileHint';
+import { BrandingBadge } from '@/components/lots/BrandingBadge';
+import { TopNav } from '@/components/lots/TopNav';
+import { ContactModal } from '@/components/lots/ContactModal';
+import { LocationView } from '@/components/lots/LocationView';
 
 interface ProjectHomePageProps {
   data: ExplorerPageData;
 }
 
-type View = 'exterior' | 'videos';
+type ActiveView = 'tour' | 'location';
 
 export function ProjectHomePage({ data }: ProjectHomePageProps) {
   const router = useRouter();
+  const { project, media, children } = data;
 
-  const hasExterior = useMemo(
-    () => data.media.some((m) => m.purpose === 'transition'),
-    [data.media]
+  const spinRef = useRef<Spin360ViewerRef>(null);
+  const [activeView, setActiveView] = useState<ActiveView>('tour');
+  const [contactOpen, setContactOpen] = useState(false);
+  const [currentViewpoint, setCurrentViewpoint] = useState('');
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const handleTransitionChange = useCallback((transitioning: boolean) => {
+    setIsTransitioning(transitioning);
+  }, []);
+
+  const logos = useMemo(
+    () => media.filter((m) => m.purpose === 'logo' || m.purpose === 'logo_developer'),
+    [media]
   );
 
-  const aerialVideos = useMemo(
-    () => data.media.filter((m) => m.type === 'video' && m.purpose === 'gallery' && (m.metadata as Record<string, unknown>)?.category === 'aerial'),
-    [data.media]
-  );
-
-  const [currentView, setCurrentView] = useState<View>('exterior');
-
-  // Build spinSvgs from media rows (type='svg', purpose='hotspot') instead of project.settings
+  // Build spinSvgs from media rows (type='svg', purpose='hotspot')
   const spinSvgs = useMemo(() => {
-    const svgMedia = data.media.filter((m) => m.type === 'svg' && m.purpose === 'hotspot');
+    const svgMedia = media.filter((m) => m.type === 'svg' && m.purpose === 'hotspot');
     const result: Record<string, string> = {};
     for (const m of svgMedia) {
       const viewpoint = (m.metadata as Record<string, unknown>)?.viewpoint as string | undefined;
@@ -38,83 +48,127 @@ export function ProjectHomePage({ data }: ProjectHomePageProps) {
       }
     }
     return result;
-  }, [data.media]);
+  }, [media]);
 
-  // Find last residential floor (top floor) to navigate into
-  const targetFloor = useMemo(() => {
-    const residential = data.children
-      .filter((c) => c.svgOverlayUrl != null)
-      .sort((a, b) => a.sortOrder - b.sortOrder);
-    return residential[residential.length - 1] ?? data.children[data.children.length - 1];
-  }, [data.children]);
-
-  const enterBuilding = useCallback(() => {
-    if (targetFloor) {
-      router.push(`/p/${data.project.slug}/${targetFloor.slug}`);
+  // Navigation target: children (when at root) or zone sibling (when at tour layer)
+  const mapTarget = useMemo(() => {
+    if (children.length > 0) {
+      return `/p/${project.slug}/${data.currentPath.join('/')}/${children[0].slug}`;
     }
-  }, [targetFloor, data.project.slug, router]);
+    // At tour layer: navigate to zone sibling
+    const currentId = data.currentLayer?.id;
+    const zoneSibling = data.siblings.find((s) => s.id !== currentId);
+    if (zoneSibling) {
+      return `/p/${project.slug}/${zoneSibling.slug}`;
+    }
+    return null;
+  }, [project.slug, data.currentPath, children, data.currentLayer, data.siblings]);
 
-  // URLs to preload into browser cache while entrance video plays
-  const preloadUrls = useMemo(() => {
-    if (!targetFloor) return [];
-    const urls: string[] = [];
-    if (targetFloor.svgOverlayUrl) urls.push(targetFloor.svgOverlayUrl);
-    const bg = data.childrenMedia[targetFloor.id]?.find(
-      (m) => m.purpose === 'background' && m.type === 'image'
-    );
-    if (bg?.url) urls.push(bg.url);
-    // Also try the layer's own backgroundImageUrl
-    if (targetFloor.backgroundImageUrl) urls.push(targetFloor.backgroundImageUrl);
-    return urls;
-  }, [targetFloor, data.childrenMedia]);
+  const homeUrl = getHomeUrl(data);
+  const backUrl = getBackUrl(data);
+
+  const isHomeLayer = data.currentLayer?.id === data.rootLayers[0]?.id;
+
+  const handleNavigate = (section: 'home' | 'map' | 'location' | 'contact') => {
+    if (section === 'home') {
+      if (isHomeLayer) {
+        setActiveView('tour');
+      } else {
+        router.push(homeUrl);
+      }
+    } else if (section === 'map') {
+      spinRef.current?.enterBuilding();
+    } else if (section === 'location') {
+      setActiveView('location');
+    }
+  };
+
+  const activeSection = activeView === 'location' ? 'location' as const : 'home' as const;
+
+  // Side arrow classes — matches LotsHomePage
+  const arrowClass =
+    'absolute top-1/2 -translate-y-1/2 z-30 w-8 h-8 md:w-10 md:h-10 xl:w-12 xl:h-12 rounded-full lots-glass flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-black/50 hover:scale-110 outline-none';
 
   return (
-    <div className="relative h-screen">
-      {/* View content */}
+    <div className="relative h-screen bg-black overflow-hidden">
+      {/* Content layer */}
       <div className="absolute inset-0">
-        {currentView === 'exterior' && (
-          <Spin360Viewer media={data.media} spinSvgs={spinSvgs} onEnterBuilding={enterBuilding} preloadOnEntrance={preloadUrls} enterLabel={data.project.type === 'lots' ? 'Explorar lotes' : 'Explorar niveles'} />
+        {activeView === 'tour' && (
+          <Spin360Viewer
+            ref={spinRef}
+            media={media}
+            spinSvgs={spinSvgs}
+            hideControls
+            enablePanorama
+            hideSvgOverlay={false}
+            hotspotTowerId="_none"
+            hotspotMarkerId="_none"
+            onViewpointChange={setCurrentViewpoint}
+            onTransitionChange={handleTransitionChange}
+            onEnterBuilding={() => {
+              if (mapTarget) router.push(mapTarget);
+            }}
+            renderNavigation={({ onPrev, onNext, isTransitioning: trans }) => {
+              if (trans) return null;
+              return (
+                <>
+                  <button
+                    onClick={onPrev}
+                    className={`${arrowClass} left-2 md:left-4 xl:left-16`}
+                    aria-label="Anterior"
+                  >
+                    <ChevronLeft className="w-4 h-4 md:w-5 md:h-5 xl:w-6 xl:h-6 text-white/90" />
+                  </button>
+                  <button
+                    onClick={onNext}
+                    className={`${arrowClass} right-2 md:right-4 xl:right-16`}
+                    aria-label="Siguiente"
+                  >
+                    <ChevronRight className="w-4 h-4 md:w-5 md:h-5 xl:w-6 xl:h-6 text-white/90" />
+                  </button>
+                </>
+              );
+            }}
+          />
         )}
-        {currentView === 'videos' && <AerialVideoGallery media={aerialVideos} />}
+        {activeView === 'location' && <LocationView project={project} />}
       </div>
 
-      {/* Bottom navigation bar */}
-      <div className="absolute bottom-4 inset-x-4 z-20 glass-panel px-4 py-3">
-        <div className="max-w-7xl mx-auto flex justify-center gap-2">
-          {hasExterior && (
-            <button
-              onClick={() => setCurrentView('exterior')}
-              aria-current={currentView === 'exterior' ? 'true' : undefined}
-              className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                currentView === 'exterior'
-                  ? 'bg-white text-gray-900'
-                  : 'bg-white/10 text-white/80 hover:bg-white/20 hover:text-white'
-              }`}
-            >
-              Exterior 360°
-            </button>
-          )}
-          <button
-            onClick={enterBuilding}
-            className="px-5 py-2 rounded-lg text-sm font-medium transition-colors bg-white/10 text-white/80 hover:bg-white/20 hover:text-white"
-          >
-            {data.project.type === 'lots' ? 'Lotes' : 'Niveles'}
-          </button>
-          {aerialVideos.length > 0 && (
-            <button
-              onClick={() => setCurrentView('videos')}
-              aria-current={currentView === 'videos' ? 'true' : undefined}
-              className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                currentView === 'videos'
-                  ? 'bg-white text-gray-900'
-                  : 'bg-white/10 text-white/80 hover:bg-white/20 hover:text-white'
-              }`}
-            >
-              Videos
-            </button>
-          )}
-        </div>
-      </div>
+      {/* Mobile hint */}
+      {activeView === 'tour' && (
+        <MobileHint
+          isTourActive
+          isTransitioning={false}
+          currentSceneId={currentViewpoint}
+          pillMessage="Tocá el edificio para explorar"
+        />
+      )}
+
+      {/* Chrome — hidden during transitions */}
+      {!isTransitioning && (
+        <>
+          <BrandingBadge project={project} logos={logos} />
+          <TopNav
+            activeSection={activeSection}
+            onNavigate={handleNavigate}
+            onContactOpen={() => setContactOpen(true)}
+            mapLabel="Niveles"
+            showBack
+            onBack={activeView === 'location'
+              ? () => setActiveView('tour')
+              : () => router.push(backUrl)
+            }
+          />
+        </>
+      )}
+
+      {/* Contact modal */}
+      <ContactModal
+        project={project}
+        logos={logos}
+        open={contactOpen}
+        onClose={() => setContactOpen(false)}
+      />
     </div>
   );
 }
