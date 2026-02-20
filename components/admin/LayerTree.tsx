@@ -23,6 +23,11 @@ export interface LayerNode {
   price: number | null;
   currency: string | null;
   is_corner: boolean | null;
+  unit_type_id: string | null;
+  front_length: number | null;
+  depth_length: number | null;
+  features: unknown[] | null;
+  properties: Record<string, unknown>;
   background_image_url: string | null;
   background_image_mobile_url: string | null;
   svg_overlay_url: string | null;

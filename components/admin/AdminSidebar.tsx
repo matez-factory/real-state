@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FolderTree, Image, Navigation } from 'lucide-react';
+import { LayoutDashboard, FolderTree, Image, Navigation, Boxes } from 'lucide-react';
 
 interface Props {
   projectId?: string;
@@ -20,6 +20,7 @@ export default function AdminSidebar({ projectId, projectName }: Props) {
     ? [
         { href: `/admin/projects/${projectId}`, label: 'General', icon: LayoutDashboard },
         { href: `/admin/projects/${projectId}/layers`, label: 'Layers', icon: FolderTree },
+        { href: `/admin/projects/${projectId}/unit-types`, label: 'Tipos de Unidad', icon: Boxes },
         { href: `/admin/projects/${projectId}/media`, label: 'Media', icon: Image },
         { href: `/admin/projects/${projectId}/tour`, label: 'Tour 360', icon: Navigation },
       ]

@@ -7,10 +7,16 @@ import { X } from 'lucide-react';
 import { FEATURE_ICON_MAP } from '@/lib/constants/feature-icons';
 import type { LayerNode } from './LayerTree';
 
+interface UnitTypeOption {
+  id: string;
+  name: string;
+}
+
 interface Props {
   projectId: string;
   parentId: string | null;
   layer?: LayerNode | null;
+  unitTypes?: UnitTypeOption[];
   onClose: () => void;
 }
 
@@ -19,7 +25,7 @@ interface FeatureItem {
   text: string;
 }
 
-export default function LayerForm({ projectId, parentId, layer, onClose }: Props) {
+export default function LayerForm({ projectId, parentId, layer, unitTypes = [], onClose }: Props) {
   const isEdit = !!layer;
   const [nameVal, setNameVal] = useState(layer?.name ?? '');
   const [slugVal, setSlugVal] = useState(layer?.slug ?? '');
@@ -28,9 +34,9 @@ export default function LayerForm({ projectId, parentId, layer, onClose }: Props
   const [features, setFeatures] = useState<FeatureItem[]>([]);
 
   useEffect(() => {
-    if (layer) {
-      // Load features from layer if available (they're stored in the DB)
-      // We'd need to fetch them — for now just initialize empty
+    if (layer?.features && Array.isArray(layer.features)) {
+      setFeatures(layer.features as FeatureItem[]);
+    } else {
       setFeatures([]);
     }
   }, [layer]);
@@ -177,7 +183,7 @@ export default function LayerForm({ projectId, parentId, layer, onClose }: Props
                     name="front_length"
                     type="number"
                     step="any"
-                    defaultValue={''}
+                    defaultValue={layer?.front_length ?? ''}
                     className={inputClass}
                   />
                 </label>
@@ -187,7 +193,7 @@ export default function LayerForm({ projectId, parentId, layer, onClose }: Props
                     name="depth_length"
                     type="number"
                     step="any"
-                    defaultValue={''}
+                    defaultValue={layer?.depth_length ?? ''}
                     className={inputClass}
                   />
                 </label>
@@ -236,6 +242,102 @@ export default function LayerForm({ projectId, parentId, layer, onClose }: Props
                 />
                 Lote esquina
               </label>
+
+              {/* Building unit fields (visible for type=unit) */}
+              {type === 'unit' && (
+                <>
+                  <div className="pt-2 border-t border-gray-200">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Datos del departamento</h3>
+                  </div>
+
+                  {unitTypes.length > 0 && (
+                    <label className="block">
+                      <span className="block text-sm font-medium text-gray-700 mb-1">Tipo de Unidad</span>
+                      <select
+                        name="unit_type_id"
+                        defaultValue={layer?.unit_type_id ?? ''}
+                        className={inputClass}
+                      >
+                        <option value="">— Sin tipo —</option>
+                        {unitTypes.map((ut) => (
+                          <option key={ut.id} value={ut.id}>{ut.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className="block">
+                      <span className="block text-sm font-medium text-gray-700 mb-1">Orientación</span>
+                      <select
+                        name="orientation"
+                        defaultValue={(layer?.properties?.orientation as string) ?? ''}
+                        className={inputClass}
+                      >
+                        <option value="">— Sin orientación —</option>
+                        <option value="Norte">Norte</option>
+                        <option value="Sur">Sur</option>
+                        <option value="Este">Este</option>
+                        <option value="Oeste">Oeste</option>
+                        <option value="Noreste">Noreste</option>
+                        <option value="Noroeste">Noroeste</option>
+                        <option value="Sudeste">Sudeste</option>
+                        <option value="Sudoeste">Sudoeste</option>
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="block text-sm font-medium text-gray-700 mb-1">Piso</span>
+                      <input
+                        name="floor_number"
+                        type="number"
+                        defaultValue={(layer?.properties?.floor_number as number) ?? ''}
+                        className={inputClass}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className="block">
+                      <span className="block text-sm font-medium text-gray-700 mb-1">Dormitorios</span>
+                      <input
+                        name="bedrooms"
+                        type="number"
+                        defaultValue={(layer?.properties?.bedrooms as number) ?? ''}
+                        className={inputClass}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="block text-sm font-medium text-gray-700 mb-1">Baños</span>
+                      <input
+                        name="bathrooms"
+                        type="number"
+                        defaultValue={(layer?.properties?.bathrooms as number) ?? ''}
+                        className={inputClass}
+                      />
+                    </label>
+                  </div>
+
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      name="has_balcony"
+                      defaultChecked={(layer?.properties?.has_balcony as boolean) ?? false}
+                      className="rounded border-gray-300"
+                    />
+                    Tiene balcón
+                  </label>
+
+                  <label className="block">
+                    <span className="block text-sm font-medium text-gray-700 mb-1">Descripción</span>
+                    <textarea
+                      name="description"
+                      rows={2}
+                      defaultValue={(layer?.properties?.description as string) ?? ''}
+                      className={inputClass}
+                    />
+                  </label>
+                </>
+              )}
 
               {/* Features mini-editor */}
               <div className="pt-2 border-t border-gray-200">

@@ -41,6 +41,13 @@ export default function ProjectMediaClient({ projectId, projectSlug, media, logo
       accept: 'image/*,.svg',
       storagePath: `${projectSlug}/branding/logo-dev.svg`,
     },
+    {
+      label: 'Thumbnail',
+      purpose: 'thumbnail',
+      type: 'image',
+      accept: 'image/*',
+      storagePath: `${projectSlug}/splash/thumbnail.webp`,
+    },
   ];
 
   function findMedia(purpose: string): MediaRow | undefined {
@@ -76,15 +83,16 @@ export default function ProjectMediaClient({ projectId, projectSlug, media, logo
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Media del Proyecto</h1>
       <p className="text-sm text-gray-500 mb-6">
-        Imagenes a nivel de proyecto. Son 3 slots fijos. Si no se sube un logo, simplemente no se muestra en la pagina publica.
+        Imagenes a nivel de proyecto. Si no se sube un logo, simplemente no se muestra en la pagina publica.
         La media de cada layer (fondos, SVGs, fichas) se gestiona desde la seccion Layers.
       </p>
 
-      <div className="grid grid-cols-3 gap-4 max-w-2xl">
-        <p className="col-span-3 text-xs text-gray-400 mb-1">
-          <strong>Splash Background:</strong> Fondo de la pantalla de inicio del proyecto.
-          <strong> Logo Proyecto:</strong> Logo del desarrollo/loteo.
-          <strong> Logo Developer:</strong> Logo de la inmobiliaria/desarrolladora (aparece en el modal de contacto).
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl">
+        <p className="col-span-2 md:col-span-4 text-xs text-gray-400 mb-1">
+          <strong>Splash Background:</strong> Fondo de la pantalla de inicio.
+          <strong> Logo Proyecto:</strong> Logo del desarrollo.
+          <strong> Logo Developer:</strong> Logo de la inmobiliaria.
+          <strong> Thumbnail:</strong> Miniatura para listados y previews.
         </p>
         {slots.map((slot) => (
           <MediaUploadSlot

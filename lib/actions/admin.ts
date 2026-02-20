@@ -233,6 +233,29 @@ export async function createLayer(formData: FormData) {
         insertData.features = [];
       }
     }
+
+    // Unit type reference
+    const unitTypeId = formData.get('unit_type_id') as string;
+    if (unitTypeId) insertData.unit_type_id = unitTypeId;
+
+    // Building-specific properties JSONB
+    const properties: Record<string, unknown> = {};
+    const orientation = formData.get('orientation') as string;
+    if (orientation) properties.orientation = orientation;
+    const bedrooms = formData.get('bedrooms') as string;
+    if (bedrooms) properties.bedrooms = parseInt(bedrooms);
+    const bathrooms = formData.get('bathrooms') as string;
+    if (bathrooms) properties.bathrooms = parseInt(bathrooms);
+    const hasBalcony = formData.get('has_balcony');
+    properties.has_balcony = hasBalcony === 'on';
+    const floorNumber = formData.get('floor_number') as string;
+    if (floorNumber) properties.floor_number = parseInt(floorNumber);
+    const description = formData.get('description') as string;
+    if (description) properties.description = description;
+
+    if (Object.keys(properties).length > 0) {
+      insertData.properties = properties;
+    }
   }
 
   const { error } = await supabase.from('layers').insert(insertData);
@@ -282,6 +305,27 @@ export async function updateLayer(id: string, formData: FormData) {
         updateData.features = [];
       }
     }
+
+    // Unit type reference
+    const unitTypeId = formData.get('unit_type_id') as string;
+    updateData.unit_type_id = unitTypeId || null;
+
+    // Building-specific properties JSONB
+    const properties: Record<string, unknown> = {};
+    const orientation = formData.get('orientation') as string;
+    if (orientation) properties.orientation = orientation;
+    const bedrooms = formData.get('bedrooms') as string;
+    if (bedrooms) properties.bedrooms = parseInt(bedrooms);
+    const bathrooms = formData.get('bathrooms') as string;
+    if (bathrooms) properties.bathrooms = parseInt(bathrooms);
+    const hasBalcony = formData.get('has_balcony');
+    properties.has_balcony = hasBalcony === 'on';
+    const floorNumber = formData.get('floor_number') as string;
+    if (floorNumber) properties.floor_number = parseInt(floorNumber);
+    const description = formData.get('description') as string;
+    if (description) properties.description = description;
+
+    updateData.properties = Object.keys(properties).length > 0 ? properties : {};
 
     // Buyer info
     const buyerName = formData.get('buyer_name') as string;
@@ -406,6 +450,86 @@ export async function importLotsFromCsv(formData: FormData) {
 }
 
 // ============================================================
+// Unit Types
+// ============================================================
+
+export async function createUnitType(formData: FormData) {
+  const supabase = createAdminClient();
+
+  const projectId = formData.get('project_id') as string;
+  const name = formData.get('name') as string;
+
+  const { error } = await supabase.from('unit_types').insert({
+    project_id: projectId,
+    name,
+    slug: (formData.get('slug') as string) || slugify(name),
+    area: formData.get('area') ? parseFloat(formData.get('area') as string) : null,
+    area_unit: (formData.get('area_unit') as string) || 'm2',
+    bedrooms: formData.get('bedrooms') ? parseInt(formData.get('bedrooms') as string) : null,
+    bathrooms: formData.get('bathrooms') ? parseInt(formData.get('bathrooms') as string) : null,
+    description: (formData.get('description') as string) || null,
+  });
+
+  if (error) throw new Error(`Error creating unit type: ${error.message}`);
+
+  revalidatePath(`/admin/projects/${projectId}/unit-types`);
+}
+
+export async function updateUnitType(id: string, formData: FormData) {
+  const supabase = createAdminClient();
+
+  const projectId = formData.get('project_id') as string;
+  const name = formData.get('name') as string;
+
+  const { error } = await supabase
+    .from('unit_types')
+    .update({
+      name,
+      slug: (formData.get('slug') as string) || slugify(name),
+      area: formData.get('area') ? parseFloat(formData.get('area') as string) : null,
+      area_unit: (formData.get('area_unit') as string) || 'm2',
+      bedrooms: formData.get('bedrooms') ? parseInt(formData.get('bedrooms') as string) : null,
+      bathrooms: formData.get('bathrooms') ? parseInt(formData.get('bathrooms') as string) : null,
+      description: (formData.get('description') as string) || null,
+    })
+    .eq('id', id);
+
+  if (error) throw new Error(`Error updating unit type: ${error.message}`);
+
+  revalidatePath(`/admin/projects/${projectId}/unit-types`);
+}
+
+export async function deleteUnitType(id: string, projectId: string) {
+  const supabase = createAdminClient();
+
+  // Delete associated media (storage + rows)
+  const { data: mediaRows } = await supabase
+    .from('media')
+    .select('id, storage_path')
+    .eq('unit_type_id', id);
+
+  if (mediaRows?.length) {
+    const storagePaths = mediaRows
+      .map((m) => m.storage_path)
+      .filter(Boolean) as string[];
+    if (storagePaths.length) {
+      await supabase.storage.from('project-media').remove(storagePaths);
+    }
+    await supabase
+      .from('media')
+      .delete()
+      .in('id', mediaRows.map((m) => m.id));
+  }
+
+  // Delete the unit type (layers referencing it get unit_type_id = NULL via SET NULL)
+  const { error } = await supabase.from('unit_types').delete().eq('id', id);
+  if (error) throw new Error(`Error deleting unit type: ${error.message}`);
+
+  revalidatePath(`/admin/projects/${projectId}/unit-types`);
+  revalidatePath(`/admin/projects/${projectId}/layers`);
+}
+
+// ============================================================
 // Media
 // ============================================================
 
@@ -417,6 +541,7 @@ export async function uploadMedia(formData: FormData) {
 
   const projectId = formData.get('project_id') as string;
   const layerId = formData.get('layer_id') as string || null;
+  const unitTypeId = formData.get('unit_type_id') as string || null;
   const purpose = formData.get('purpose') as string;
   const type = formData.get('type') as string;
   const storagePath = formData.get('storage_path') as string;
@@ -449,7 +574,7 @@ export async function uploadMedia(formData: FormData) {
     .getPublicUrl(storagePath);
   const url = urlData.publicUrl;
 
-  // Delete existing media with same purpose+layer (replace pattern)
+  // Delete existing media with same purpose+owner (replace pattern)
   if (layerId) {
     await supabase
       .from('media')
@@ -457,13 +582,21 @@ export async function uploadMedia(formData: FormData) {
       .eq('project_id', projectId)
       .eq('layer_id', layerId)
       .eq('purpose', purpose);
+  } else if (unitTypeId) {
+    await supabase
+      .from('media')
+      .delete()
+      .eq('project_id', projectId)
+      .eq('unit_type_id', unitTypeId)
+      .eq('purpose', purpose);
   } else {
-    // Project-level media: match on null layer_id
+    // Project-level media: match on null layer_id and null unit_type_id
     await supabase
       .from('media')
       .delete()
       .eq('project_id', projectId)
       .is('layer_id', null)
+      .is('unit_type_id', null)
       .eq('purpose', purpose);
   }
 
@@ -471,6 +604,7 @@ export async function uploadMedia(formData: FormData) {
   const { error: insertError } = await supabase.from('media').insert({
     project_id: projectId,
     layer_id: layerId,
+    unit_type_id: unitTypeId,
     type,
     purpose,
     storage_path: storagePath,
@@ -499,6 +633,7 @@ export async function uploadMedia(formData: FormData) {
   revalidatePath(`/admin/projects/${projectId}`);
   revalidatePath(`/admin/projects/${projectId}/layers`);
   revalidatePath(`/admin/projects/${projectId}/media`);
+  revalidatePath(`/admin/projects/${projectId}/unit-types`);
   revalidatePath(`/admin/projects/${projectId}/tour`);
 
   return { url };

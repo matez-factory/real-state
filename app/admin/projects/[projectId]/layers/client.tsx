@@ -22,10 +22,20 @@ interface RawLayer {
   price: number | null;
   currency: string | null;
   is_corner: boolean | null;
+  unit_type_id: string | null;
+  front_length: number | null;
+  depth_length: number | null;
+  features: unknown[] | null;
+  properties: Record<string, unknown>;
   background_image_url: string | null;
   background_image_mobile_url: string | null;
   svg_overlay_url: string | null;
   svg_overlay_mobile_url: string | null;
+}
+
+interface UnitTypeOption {
+  id: string;
+  name: string;
 }
 
 interface Props {
@@ -33,6 +43,7 @@ interface Props {
   projectSlug: string;
   projectName: string;
   rawLayers: RawLayer[];
+  unitTypes: UnitTypeOption[];
 }
 
 function buildTree(layers: RawLayer[]): LayerNode[] {
@@ -57,7 +68,7 @@ function buildTree(layers: RawLayer[]): LayerNode[] {
   return roots;
 }
 
-export default function LayersPageClient({ projectId, projectSlug, projectName, rawLayers }: Props) {
+export default function LayersPageClient({ projectId, projectSlug, projectName, rawLayers, unitTypes }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [showCsv, setShowCsv] = useState(false);
   const [editLayer, setEditLayer] = useState<LayerNode | null>(null);
@@ -136,6 +147,7 @@ export default function LayersPageClient({ projectId, projectSlug, projectName, 
           projectId={projectId}
           parentId={addParentId}
           layer={editLayer}
+          unitTypes={unitTypes}
           onClose={handleCloseForm}
         />
       )}

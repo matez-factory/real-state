@@ -1,13 +1,13 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { notFound } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
-import LayersPageClient from './client';
+import UnitTypesClient from './client';
 
 interface Props {
   params: Promise<{ projectId: string }>;
 }
 
-export default async function LayersPage({ params }: Props) {
+export default async function UnitTypesPage({ params }: Props) {
   const { projectId } = await params;
   const supabase = createAdminClient();
 
@@ -19,28 +19,28 @@ export default async function LayersPage({ params }: Props) {
 
   if (!project) notFound();
 
-  const { data: layers } = await supabase
-    .from('layers')
-    .select('*')
-    .eq('project_id', projectId)
-    .order('sort_order', { ascending: true });
-
   const { data: unitTypes } = await supabase
     .from('unit_types')
-    .select('id, name')
+    .select('*')
     .eq('project_id', projectId)
     .order('name');
+
+  // Fetch media with unit_type_id for this project
+  const { data: media } = await supabase
+    .from('media')
+    .select('*')
+    .eq('project_id', projectId)
+    .not('unit_type_id', 'is', null);
 
   return (
     <div className="flex min-h-screen">
       <AdminSidebar projectId={projectId} projectName={project.name} />
       <div className="flex-1 p-8">
-        <LayersPageClient
+        <UnitTypesClient
           projectId={projectId}
           projectSlug={project.slug}
-          projectName={project.name}
-          rawLayers={layers ?? []}
           unitTypes={unitTypes ?? []}
+          media={media ?? []}
         />
       </div>
     </div>
