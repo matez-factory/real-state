@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import { PROJECT_STATUS_LABELS } from '@/lib/constants/status';
 import type { ProjectStatus, ProjectType } from '@/types/hierarchy.types';
-import { Plus } from 'lucide-react';
+import { ExternalLink, Plus } from 'lucide-react';
 
 const TYPE_LABELS: Record<ProjectType, string> = {
   lots: 'Loteo',
@@ -44,6 +44,7 @@ export default async function AdminProjectsPage() {
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Tipo</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Estado</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Slug</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Live</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">Acciones</th>
                 </tr>
               </thead>
@@ -58,6 +59,16 @@ export default async function AdminProjectsPage() {
                       <StatusBadge status={p.status as ProjectStatus} />
                     </td>
                     <td className="px-4 py-3 text-gray-500 font-mono text-xs">{p.slug}</td>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/p/${p.slug}`}
+                        target="_blank"
+                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        Ver
+                        <ExternalLink size={14} />
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <Link
                         href={`/admin/projects/${p.id}`}

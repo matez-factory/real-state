@@ -103,6 +103,10 @@ export interface RawLayer {
   // Unit type
   unit_type_id: string | null;
 
+  // Tour & video
+  tour_embed_url: string | null;
+  video_url: string | null;
+
   // Buyer info
   buyer_name: string | null;
   buyer_email: string | null;
@@ -129,6 +133,18 @@ export interface RawMedia {
   alt_text: string | null;
   sort_order: number;
   metadata: Record<string, unknown>;
+}
+
+export interface RawUnitType {
+  id: string;
+  project_id: string;
+  name: string;
+  slug: string | null;
+  area: number | null;
+  area_unit: string | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  description: string | null;
 }
 
 // ============================================================
@@ -217,6 +233,10 @@ export function transformLayer(raw: RawLayer): Layer {
     unitTypeId: raw.unit_type_id || undefined,
     unitTypeName: (props.unit_type as string | undefined) ?? undefined,
 
+    // Tour & video
+    tourEmbedUrl: raw.tour_embed_url || undefined,
+    videoUrl: raw.video_url || undefined,
+
     // Fallback from properties (backward compat)
     bedrooms: (props.bedrooms as number | undefined) ?? undefined,
     bathrooms: (props.bathrooms as number | undefined) ?? undefined,
@@ -261,10 +281,21 @@ export function buildExplorerPageData(
   rawProject: RawProject,
   rawLayers: RawLayer[],
   rawMedia: RawMedia[],
-  layerSlugs: string[]
+  layerSlugs: string[],
+  rawUnitTypes: RawUnitType[] = []
 ): ExplorerPageData {
   const project = transformProject(rawProject);
-  const allLayers = rawLayers.map(transformLayer);
+
+  // Build unit type lookup and patch unitTypeName onto layers
+  const unitTypeMap = new Map(rawUnitTypes.map(ut => [ut.id, ut.name]));
+  const allLayers = rawLayers.map(raw => {
+    const layer = transformLayer(raw);
+    if (layer.unitTypeId && !layer.unitTypeName) {
+      layer.unitTypeName = unitTypeMap.get(layer.unitTypeId);
+    }
+    return layer;
+  });
+
   const allMedia = rawMedia.map(transformMedia);
 
   // Walk the slug path to find the current layer
@@ -301,8 +332,12 @@ export function buildExplorerPageData(
   const includeAllProjectMedia = !currentLayer;
   const media = allMedia
     .filter((m) =>
-      (currentLayer ? m.layerId === currentLayer.id : !m.layerId) ||
-      (!m.layerId && (includeAllProjectMedia || m.purpose === 'logo' || m.purpose === 'logo_developer'))
+      // Media directa del layer
+      (currentLayer ? m.layerId === currentLayer.id : !m.layerId && !m.unitTypeId) ||
+      // Media del unit_type del layer (fichas compartidas)
+      (currentLayer?.unitTypeId && m.unitTypeId === currentLayer.unitTypeId && !m.layerId) ||
+      // Media project-level (logos siempre, todo si estamos en root)
+      (!m.layerId && !m.unitTypeId && (includeAllProjectMedia || m.purpose === 'logo' || m.purpose === 'logo_developer'))
     )
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
@@ -310,7 +345,10 @@ export function buildExplorerPageData(
   const childrenMedia: Record<string, Media[]> = {};
   for (const child of children) {
     childrenMedia[child.id] = allMedia
-      .filter((m) => m.layerId === child.id)
+      .filter((m) =>
+        m.layerId === child.id ||
+        (child.unitTypeId && m.unitTypeId === child.unitTypeId && !m.layerId)
+      )
       .sort((a, b) => a.sortOrder - b.sortOrder);
   }
 
@@ -361,9 +399,10 @@ export function buildSiblingExplorerBundle(
   rawProject: RawProject,
   rawLayers: RawLayer[],
   rawMedia: RawMedia[],
-  layerSlugs: string[]
+  layerSlugs: string[],
+  rawUnitTypes: RawUnitType[] = []
 ): SiblingExplorerBundle {
-  const current = buildExplorerPageData(rawProject, rawLayers, rawMedia, layerSlugs);
+  const current = buildExplorerPageData(rawProject, rawLayers, rawMedia, layerSlugs, rawUnitTypes);
 
   const siblingDataMap: Record<string, ExplorerPageData> = {};
   const parentPath = layerSlugs.slice(0, -1);
@@ -372,7 +411,7 @@ export function buildSiblingExplorerBundle(
   for (const sibling of current.siblings) {
     const siblingPath = [...parentPath, sibling.slug];
     siblingDataMap[sibling.id] = buildExplorerPageData(
-      rawProject, rawLayers, rawMedia, siblingPath
+      rawProject, rawLayers, rawMedia, siblingPath, rawUnitTypes
     );
   }
 

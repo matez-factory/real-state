@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useTransitionRouter } from 'next-view-transitions';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ExplorerPageData } from '@/types/hierarchy.types';
 import { getHomeUrl, getBackUrl } from '@/lib/navigation';
@@ -19,7 +19,7 @@ interface ProjectHomePageProps {
 type ActiveView = 'tour' | 'location';
 
 export function ProjectHomePage({ data }: ProjectHomePageProps) {
-  const router = useRouter();
+  const router = useTransitionRouter();
   const { project, media, children } = data;
 
   const spinRef = useRef<Spin360ViewerRef>(null);
@@ -90,7 +90,7 @@ export function ProjectHomePage({ data }: ProjectHomePageProps) {
     'absolute top-1/2 -translate-y-1/2 z-30 w-8 h-8 md:w-10 md:h-10 xl:w-12 xl:h-12 rounded-full lots-glass flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-black/50 hover:scale-110 outline-none';
 
   return (
-    <div className="relative h-screen bg-black overflow-hidden">
+    <div className="relative h-screen overflow-hidden bg-black">
       {/* Content layer */}
       <div className="absolute inset-0">
         {activeView === 'tour' && (

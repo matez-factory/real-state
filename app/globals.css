@@ -59,7 +59,17 @@ body {
 
 /* Animations */
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-.animate-fade-in { animation: fadeIn 0.5s ease-out; }
+.animate-fade-in { animation: fadeIn 0.3s ease-out; }
+
+/* View Transitions — smooth crossfade between pages */
+::view-transition-old(root) {
+  animation: vtFadeOut 0.3s ease-out both;
+}
+::view-transition-new(root) {
+  animation: vtFadeIn 0.3s ease-in both;
+}
+@keyframes vtFadeOut { to { opacity: 0; } }
+@keyframes vtFadeIn { from { opacity: 0; } }
 
 @keyframes hotspotPulse {
   0%, 100% { fill: rgba(255,255,255,0.1); stroke: rgba(255,255,255,0.4); }

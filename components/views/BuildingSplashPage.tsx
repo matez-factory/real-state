@@ -1,16 +1,17 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useTransitionRouter } from 'next-view-transitions';
 import { useState, useMemo, useCallback } from 'react';
 import { ExplorerPageData } from '@/types/hierarchy.types';
 import { VideoPlayer } from '@/components/video/VideoPlayer';
+import { FadeImage } from '@/components/shared/FadeImage';
 
 interface BuildingSplashPageProps {
   data: ExplorerPageData;
 }
 
 export function BuildingSplashPage({ data }: BuildingSplashPageProps) {
-  const router = useRouter();
+  const router = useTransitionRouter();
   const { project, media, children, childrenMedia } = data;
 
   const [introPlaying, setIntroPlaying] = useState(false);
@@ -57,9 +58,9 @@ export function BuildingSplashPage({ data }: BuildingSplashPageProps) {
   }, [firstChildSlug, project.slug, router]);
 
   return (
-    <div className="relative h-screen bg-black overflow-hidden">
+    <div className="relative h-screen overflow-hidden bg-black">
       {backgroundUrl && (
-        <img
+        <FadeImage
           src={backgroundUrl}
           alt=""
           className="absolute inset-0 w-full h-full object-cover"

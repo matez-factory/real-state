@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useTransitionRouter } from 'next-view-transitions';
 import {
   ChevronLeft,
   ChevronRight,
@@ -9,13 +9,19 @@ import {
   Phone,
   Share2,
   Check,
+  Eye,
+  X,
+  Images,
+  Play,
 } from 'lucide-react';
+import { VideoPlayer } from '@/components/video/VideoPlayer';
 import { ExplorerPageData, Layer } from '@/types/hierarchy.types';
 import { getHomeUrl, getBackUrl } from '@/lib/navigation';
 import { STATUS_LABELS } from '@/lib/constants/status';
 import { TopNav } from '@/components/lots/TopNav';
 import { ContactModal } from '@/components/lots/ContactModal';
 import { LocationView } from '@/components/lots/LocationView';
+import { FadeImage } from '@/components/shared/FadeImage';
 
 interface UnitPageProps {
   data: ExplorerPageData;
@@ -29,16 +35,26 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
   not_available: 'bg-gray-500/80 text-white',
 };
 
+function getEmbedUrl(url: string): string {
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+  return url;
+}
+
 type ActiveView = 'unit' | 'location';
 
 export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
-  const router = useRouter();
+  const router = useTransitionRouter();
   const { project, currentLayer, media, siblings, currentPath } = data;
 
   const [copied, setCopied] = useState(false);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [activeView, setActiveView] = useState<ActiveView>('unit');
   const [contactOpen, setContactOpen] = useState(false);
+  const [tourModalOpen, setTourModalOpen] = useState(false);
+  const [mediaTab, setMediaTab] = useState<'gallery' | 'video' | 'tour'>('gallery');
 
   // Touch swipe
   const touchStartX = useRef(0);
@@ -49,12 +65,9 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
   const {
     area, price, description, orientation, features,
     frontLength, depthLength, bedrooms, bathrooms,
-    unitTypeName, hasBalcony, floorNumber,
+    unitTypeName, hasBalcony, floorNumber, isCorner, areaUnit,
+    tourEmbedUrl, videoUrl,
   } = currentLayer;
-
-  const isBuilding = project.type === 'building';
-  const entityPrefix = isBuilding ? 'Depto' : 'Lote';
-  const statusLabel = STATUS_LABELS[currentLayer.status]?.toUpperCase() ?? currentLayer.status;
 
   const galleryImages = useMemo(() => {
     const fichaImages = media.filter(
@@ -65,6 +78,28 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
     );
     return [...fichaImages, ...otherImages];
   }, [media]);
+
+  const uploadedVideos = useMemo(
+    () => media.filter((m) => m.type === 'video'),
+    [media]
+  );
+
+  const hasVideo = !!videoUrl || uploadedVideos.length > 0;
+  const hasTour = !!tourEmbedUrl;
+  const hasGallery = galleryImages.length > 0;
+  const mediaTabs = useMemo(() => {
+    const tabs: { key: 'gallery' | 'video' | 'tour'; label: string; icon: typeof Images }[] = [];
+    if (hasGallery) tabs.push({ key: 'gallery', label: 'Galería', icon: Images });
+    if (hasVideo) tabs.push({ key: 'video', label: 'Video', icon: Play });
+    if (hasTour) tabs.push({ key: 'tour', label: 'Tour 360', icon: Eye });
+    return tabs;
+  }, [hasGallery, hasVideo, hasTour]);
+  const showTabs = mediaTabs.length > 1;
+
+  const areaLabel = areaUnit === 'ft2' ? 'ft²' : areaUnit === 'ha' ? 'ha' : 'm²';
+  const isBuilding = project.type === 'building';
+  const entityPrefix = isBuilding ? 'Depto' : 'Lote';
+  const statusLabel = STATUS_LABELS[currentLayer.status]?.toUpperCase() ?? currentLayer.status;
 
   const logos = useMemo(
     () => media.filter((m) => m.purpose === 'logo' || m.purpose === 'logo_developer'),
@@ -85,6 +120,7 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
 
   const characteristics: string[] = [];
   if (hasBalcony) characteristics.push('Balcón');
+  if (isCorner) characteristics.push('Esquina');
   if (features) features.forEach(f => characteristics.push(f.text));
 
   // Navigation
@@ -153,7 +189,7 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
       {/* Floor background image */}
       {floorBackgroundUrl && (
         <div className="fixed inset-0 pointer-events-none">
-          <img src={floorBackgroundUrl} alt="" className="w-full h-full object-cover opacity-30 blur-sm" />
+          <FadeImage src={floorBackgroundUrl} alt="" className="w-full h-full object-cover opacity-30 blur-sm" />
           <div className="absolute inset-0 bg-black/60" />
         </div>
       )}
@@ -186,66 +222,131 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
 
             {/* Two-column content */}
             <div className="relative max-w-7xl mx-auto px-6 xl:px-8 py-8 grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-8 items-start">
-              {/* Left: Image carousel */}
+              {/* Left: Media area with tabs */}
               <div>
-                <div
-                  className="relative bg-white/5 rounded-2xl overflow-hidden flex items-center justify-center min-h-[300px] xl:min-h-[420px]"
-                  onTouchStart={handleTouchStart}
-                  onTouchEnd={handleTouchEnd}
-                >
-                  {galleryImages.length > 0 ? (
-                    <img
-                      src={galleryImages[carouselIndex]?.url}
-                      alt={`${entityPrefix} ${currentLayer.label} — ${carouselIndex + 1}/${galleryImages.length}`}
-                      className="w-full h-auto object-contain p-4 xl:p-6"
-                      draggable={false}
-                    />
-                  ) : (
-                    <span className="text-white/20 text-sm">Sin imagen disponible</span>
-                  )}
-
-                  {/* Navigation arrows — desktop (xl) only */}
-                  {galleryImages.length > 1 && (
-                    <>
+                {/* Tabs */}
+                {showTabs && (
+                  <div className="flex gap-1 mb-3">
+                    {mediaTabs.map(({ key, label, icon: Icon }) => (
                       <button
-                        onClick={prevImage}
-                        className="hidden xl:flex absolute left-8 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 items-center justify-center transition-colors outline-none"
-                        aria-label="Anterior"
-                      >
-                        <ChevronLeft className="w-4 h-4 text-white" />
-                      </button>
-                      <button
-                        onClick={nextImage}
-                        className="hidden xl:flex absolute right-8 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 items-center justify-center transition-colors outline-none"
-                        aria-label="Siguiente"
-                      >
-                        <ChevronRight className="w-4 h-4 text-white" />
-                      </button>
-                    </>
-                  )}
-
-                  {/* Counter badge */}
-                  {galleryImages.length > 1 && (
-                    <div className="absolute bottom-3 right-3 bg-black/60 px-3 py-1 rounded-full text-xs text-white/70">
-                      {carouselIndex + 1} / {galleryImages.length}
-                    </div>
-                  )}
-                </div>
-
-                {/* Thumbnails */}
-                {galleryImages.length > 1 && (
-                  <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
-                    {galleryImages.map((img, i) => (
-                      <button
-                        key={img.id}
-                        onClick={() => setCarouselIndex(i)}
-                        className={`w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors outline-none flex-shrink-0 ${
-                          i === carouselIndex ? 'border-white/60' : 'border-transparent hover:border-white/30'
+                        key={key}
+                        onClick={() => setMediaTab(key)}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors outline-none ${
+                          mediaTab === key
+                            ? 'bg-white/15 text-white'
+                            : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60'
                         }`}
                       >
-                        <img src={img.url!} alt={`Miniatura ${i + 1}`} className="w-full h-full object-cover" />
+                        <Icon className="w-4 h-4" />
+                        {label}
                       </button>
                     ))}
+                  </div>
+                )}
+
+                {/* Tab content: Gallery */}
+                {(mediaTab === 'gallery' || (!showTabs && hasGallery)) && mediaTab !== 'video' && mediaTab !== 'tour' && (
+                  <>
+                    <div
+                      className="relative bg-white/5 rounded-2xl overflow-hidden flex items-center justify-center min-h-[300px] xl:min-h-[420px]"
+                      onTouchStart={handleTouchStart}
+                      onTouchEnd={handleTouchEnd}
+                    >
+                      {galleryImages.length > 0 ? (
+                        <img
+                          src={galleryImages[carouselIndex]?.url}
+                          alt={`${entityPrefix} ${currentLayer.label} — ${carouselIndex + 1}/${galleryImages.length}`}
+                          className="w-full h-auto object-contain p-4 xl:p-6"
+                          draggable={false}
+                        />
+                      ) : (
+                        <span className="text-white/20 text-sm">Sin imagen disponible</span>
+                      )}
+
+                      {galleryImages.length > 1 && (
+                        <>
+                          <button
+                            onClick={prevImage}
+                            className="hidden xl:flex absolute left-8 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 items-center justify-center transition-colors outline-none"
+                            aria-label="Anterior"
+                          >
+                            <ChevronLeft className="w-4 h-4 text-white" />
+                          </button>
+                          <button
+                            onClick={nextImage}
+                            className="hidden xl:flex absolute right-8 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 items-center justify-center transition-colors outline-none"
+                            aria-label="Siguiente"
+                          >
+                            <ChevronRight className="w-4 h-4 text-white" />
+                          </button>
+                        </>
+                      )}
+
+                      {galleryImages.length > 1 && (
+                        <div className="absolute bottom-3 right-3 bg-black/60 px-3 py-1 rounded-full text-xs text-white/70">
+                          {carouselIndex + 1} / {galleryImages.length}
+                        </div>
+                      )}
+                    </div>
+
+                    {galleryImages.length > 1 && (
+                      <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+                        {galleryImages.map((img, i) => (
+                          <button
+                            key={img.id}
+                            onClick={() => setCarouselIndex(i)}
+                            className={`w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors outline-none flex-shrink-0 ${
+                              i === carouselIndex ? 'border-white/60' : 'border-transparent hover:border-white/30'
+                            }`}
+                          >
+                            <img src={img.url!} alt={`Miniatura ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Tab content: Video */}
+                {mediaTab === 'video' && (
+                  <div className="space-y-4">
+                    {videoUrl && (
+                      <div className="rounded-2xl overflow-hidden bg-white/5">
+                        <div className="aspect-video">
+                          <iframe
+                            src={getEmbedUrl(videoUrl)}
+                            className="w-full h-full"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {uploadedVideos.map((v) => (
+                      <div key={v.id} className="rounded-2xl overflow-hidden">
+                        <VideoPlayer src={v.url!} className="w-full aspect-video" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Tab content: Tour 360 */}
+                {mediaTab === 'tour' && tourEmbedUrl && (
+                  <div className="relative rounded-2xl overflow-hidden bg-white/5">
+                    <div className="aspect-video">
+                      <iframe
+                        src={getEmbedUrl(tourEmbedUrl)}
+                        className="w-full h-full"
+                        allow="xr-spatial-tracking; gyroscope; accelerometer"
+                        allowFullScreen
+                      />
+                    </div>
+                    <button
+                      onClick={() => setTourModalOpen(true)}
+                      className="absolute top-3 right-3 px-3 py-1.5 bg-black/60 hover:bg-black/80 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> Pantalla completa
+                    </button>
                   </div>
                 )}
               </div>
@@ -259,7 +360,7 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
                     </div>
                     {pricePerM2 != null && (
                       <div className="text-sm text-white/40 mt-1">
-                        USD {pricePerM2} / m²
+                        USD {pricePerM2} / {areaLabel}
                       </div>
                     )}
                   </div>
@@ -271,13 +372,13 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
                     {isBuilding ? (
                       <>
                         {unitTypeName && <DetailRow label="Tipo" value={unitTypeName} />}
-                        {area != null && area > 0 && <DetailRow label="Superficie" value={`${area} m²`} />}
+                        {area != null && area > 0 && <DetailRow label="Superficie" value={`${area} ${areaLabel}`} />}
                         {ambientes && <DetailRow label="Ambientes" value={ambientes} />}
                         {orientation && <DetailRow label="Orientación" value={orientation} />}
                       </>
                     ) : (
                       <>
-                        {area != null && area > 0 && <DetailRow label="Superficie" value={`${area} m²`} />}
+                        {area != null && area > 0 && <DetailRow label="Superficie" value={`${area} ${areaLabel}`} />}
                         {dimensions && <DetailRow label="Dimensiones" value={dimensions} />}
                       </>
                     )}
@@ -343,7 +444,7 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
                       >
                         <div className="font-semibold text-white text-sm">{sibling.name}</div>
                         {sibling.area && (
-                          <div className="text-xs text-white/40 mt-1">{sibling.area} m²</div>
+                          <div className="text-xs text-white/40 mt-1">{sibling.area} {areaLabel}</div>
                         )}
                         {sibling.price && (
                           <div className="text-sm font-medium text-green-400 mt-1">
@@ -366,7 +467,7 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
 
           {/* ============ LANDSCAPE MOBILE ============ */}
           <div className="relative h-full hidden max-xl:landscape:flex flex-row">
-            {/* Left column: header + image carousel */}
+            {/* Left column: header + media with tabs */}
             <div className="w-[55%] h-full flex flex-col p-3 pt-2">
               {/* Compact header */}
               <div className="flex items-center gap-2 mb-1.5">
@@ -388,43 +489,106 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
                 <p className="text-[10px] text-white/30 ml-9 -mt-0.5 mb-1">Piso {floorNumber}</p>
               )}
 
-              {/* Image (swipeable, fills remaining height) */}
-              <div
-                className="flex-1 min-h-0 relative bg-white/5 rounded-xl overflow-hidden flex items-center justify-center"
-                onTouchStart={handleTouchStart}
-                onTouchEnd={handleTouchEnd}
-              >
-                {galleryImages.length > 0 ? (
-                  <img
-                    src={galleryImages[carouselIndex]?.url}
-                    alt={`${entityPrefix} ${currentLayer.label}`}
-                    className="w-full h-full object-contain p-2"
-                    draggable={false}
-                  />
-                ) : (
-                  <span className="text-white/20 text-xs">Sin imagen</span>
-                )}
-                {galleryImages.length > 1 && (
-                  <div className="absolute bottom-2 right-2 bg-black/60 px-2 py-0.5 rounded-full text-[10px] text-white/70">
-                    {carouselIndex + 1} / {galleryImages.length}
-                  </div>
-                )}
-              </div>
-
-              {/* Compact thumbnails */}
-              {galleryImages.length > 1 && (
-                <div className="flex gap-1.5 mt-1.5 overflow-x-auto pb-0.5">
-                  {galleryImages.map((img, i) => (
+              {/* Compact tabs */}
+              {showTabs && (
+                <div className="flex gap-1 mb-1.5">
+                  {mediaTabs.map(({ key, label, icon: Icon }) => (
                     <button
-                      key={img.id}
-                      onClick={() => setCarouselIndex(i)}
-                      className={`w-10 h-10 rounded-md overflow-hidden border-2 transition-colors outline-none flex-shrink-0 ${
-                        i === carouselIndex ? 'border-white/60' : 'border-transparent hover:border-white/30'
+                      key={key}
+                      onClick={() => setMediaTab(key)}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium transition-colors outline-none ${
+                        mediaTab === key
+                          ? 'bg-white/15 text-white'
+                          : 'bg-white/5 text-white/40 hover:bg-white/10'
                       }`}
                     >
-                      <img src={img.url!} alt={`Miniatura ${i + 1}`} className="w-full h-full object-cover" />
+                      <Icon className="w-3 h-3" />
+                      {label}
                     </button>
                   ))}
+                </div>
+              )}
+
+              {/* Gallery content */}
+              {(mediaTab === 'gallery' || (!showTabs && hasGallery)) && mediaTab !== 'video' && mediaTab !== 'tour' && (
+                <>
+                  <div
+                    className="flex-1 min-h-0 relative bg-white/5 rounded-xl overflow-hidden flex items-center justify-center"
+                    onTouchStart={handleTouchStart}
+                    onTouchEnd={handleTouchEnd}
+                  >
+                    {galleryImages.length > 0 ? (
+                      <img
+                        src={galleryImages[carouselIndex]?.url}
+                        alt={`${entityPrefix} ${currentLayer.label}`}
+                        className="w-full h-full object-contain p-2"
+                        draggable={false}
+                      />
+                    ) : (
+                      <span className="text-white/20 text-xs">Sin imagen</span>
+                    )}
+                    {galleryImages.length > 1 && (
+                      <div className="absolute bottom-2 right-2 bg-black/60 px-2 py-0.5 rounded-full text-[10px] text-white/70">
+                        {carouselIndex + 1} / {galleryImages.length}
+                      </div>
+                    )}
+                  </div>
+                  {galleryImages.length > 1 && (
+                    <div className="flex gap-1.5 mt-1.5 overflow-x-auto pb-0.5">
+                      {galleryImages.map((img, i) => (
+                        <button
+                          key={img.id}
+                          onClick={() => setCarouselIndex(i)}
+                          className={`w-10 h-10 rounded-md overflow-hidden border-2 transition-colors outline-none flex-shrink-0 ${
+                            i === carouselIndex ? 'border-white/60' : 'border-transparent hover:border-white/30'
+                          }`}
+                        >
+                          <img src={img.url!} alt={`Miniatura ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Video content */}
+              {mediaTab === 'video' && (
+                <div className="flex-1 min-h-0 space-y-2">
+                  {videoUrl && (
+                    <div className="rounded-xl overflow-hidden bg-white/5 h-full">
+                      <div className="aspect-video">
+                        <iframe
+                          src={getEmbedUrl(videoUrl)}
+                          className="w-full h-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {uploadedVideos.map((v) => (
+                    <div key={v.id} className="rounded-xl overflow-hidden">
+                      <VideoPlayer src={v.url!} className="w-full aspect-video" />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Tour content */}
+              {mediaTab === 'tour' && tourEmbedUrl && (
+                <div className="flex-1 min-h-0 relative rounded-xl overflow-hidden bg-white/5">
+                  <iframe
+                    src={getEmbedUrl(tourEmbedUrl)}
+                    className="w-full h-full"
+                    allow="xr-spatial-tracking; gyroscope; accelerometer"
+                    allowFullScreen
+                  />
+                  <button
+                    onClick={() => setTourModalOpen(true)}
+                    className="absolute top-2 right-2 px-2 py-1 bg-black/60 hover:bg-black/80 rounded-md text-[10px] font-medium transition-colors flex items-center gap-1"
+                  >
+                    <Eye className="w-3 h-3" /> Expandir
+                  </button>
                 </div>
               )}
             </div>
@@ -436,7 +600,7 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
                 <div className="bg-white/5 rounded-xl p-3">
                   <div className="text-lg font-bold">USD $ {price.toLocaleString('es-AR')}</div>
                   {pricePerM2 != null && (
-                    <div className="text-[11px] text-white/40 mt-0.5">USD {pricePerM2} / m²</div>
+                    <div className="text-[11px] text-white/40 mt-0.5">USD {pricePerM2} / {areaLabel}</div>
                   )}
                 </div>
               )}
@@ -448,13 +612,13 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
                   {isBuilding ? (
                     <>
                       {unitTypeName && <DetailRow label="Tipo" value={unitTypeName} compact />}
-                      {area != null && area > 0 && <DetailRow label="Superficie" value={`${area} m²`} compact />}
+                      {area != null && area > 0 && <DetailRow label="Superficie" value={`${area} ${areaLabel}`} compact />}
                       {ambientes && <DetailRow label="Ambientes" value={ambientes} compact />}
                       {orientation && <DetailRow label="Orientación" value={orientation} compact />}
                     </>
                   ) : (
                     <>
-                      {area != null && area > 0 && <DetailRow label="Superficie" value={`${area} m²`} compact />}
+                      {area != null && area > 0 && <DetailRow label="Superficie" value={`${area} ${areaLabel}`} compact />}
                       {dimensions && <DetailRow label="Dimensiones" value={dimensions} compact />}
                     </>
                   )}
@@ -518,7 +682,7 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
                           }`}
                         >
                           <div className="font-semibold text-white text-[11px]">{sibling.name}</div>
-                          {sibling.area && <div className="text-[9px] text-white/40">{sibling.area} m²</div>}
+                          {sibling.area && <div className="text-[9px] text-white/40">{sibling.area} {areaLabel}</div>}
                           <span className={`mt-1 inline-flex px-1.5 py-0.5 rounded-full text-[8px] font-bold ${STATUS_BADGE_STYLES[sibling.status]}`}>
                             {STATUS_LABELS[sibling.status]}
                           </span>
@@ -552,6 +716,32 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
         open={contactOpen}
         onClose={() => setContactOpen(false)}
       />
+
+      {/* Tour 360 modal */}
+      {tourModalOpen && tourEmbedUrl && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center"
+          onClick={() => setTourModalOpen(false)}
+        >
+          <div
+            className="relative w-full h-full max-w-6xl max-h-[90vh] m-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setTourModalOpen(false)}
+              className="absolute top-3 right-3 z-10 w-10 h-10 bg-black/60 hover:bg-black rounded-full flex items-center justify-center text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <iframe
+              src={getEmbedUrl(tourEmbedUrl)}
+              className="w-full h-full rounded-xl"
+              allow="xr-spatial-tracking; gyroscope; accelerometer"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

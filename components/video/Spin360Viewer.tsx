@@ -71,6 +71,7 @@ export const Spin360Viewer = forwardRef<Spin360ViewerRef, Spin360ViewerProps>(fu
   const [transitionVideoUrl, setTransitionVideoUrl] = useState<string | null>(null);
   const [entranceVideoUrl, setEntranceVideoUrl] = useState<string | null>(null);
   const [entranceVideoPlaying, setEntranceVideoPlaying] = useState(false);
+  const [entranceFadingOut, setEntranceFadingOut] = useState(false);
   const [tooltip, setTooltip] = useState<{ visible: boolean; x: number; y: number }>({
     visible: false, x: 0, y: 0,
   });
@@ -576,16 +577,26 @@ export const Spin360Viewer = forwardRef<Spin360ViewerRef, Spin360ViewerProps>(fu
       })}
 
       {/* Entrance video — starts behind images (z-1), promoted above
-          everything (z-50) once the first frame is playing */}
+          everything (z-50) once the first frame is playing.
+          On end: fades to black over 500ms, then navigates. */}
       {entranceVideoUrl && (
-        <div className="absolute inset-0" style={{ zIndex: entranceVideoPlaying ? 50 : 1 }}>
+        <div
+          className="absolute inset-0 transition-opacity duration-500"
+          style={{
+            zIndex: entranceVideoPlaying ? 50 : 1,
+            opacity: entranceFadingOut ? 0 : 1,
+          }}
+        >
           <VideoPlayer
             src={entranceVideoUrl}
             autoPlay
             muted
             controls={false}
             onPlaying={() => setEntranceVideoPlaying(true)}
-            onEnded={() => onEnterBuilding?.()}
+            onEnded={() => {
+              setEntranceFadingOut(true);
+              setTimeout(() => onEnterBuilding?.(), 500);
+            }}
             className="w-full h-full"
           />
         </div>

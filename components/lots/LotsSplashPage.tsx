@@ -1,16 +1,17 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useTransitionRouter } from 'next-view-transitions';
 import { useMemo } from 'react';
 import { ExplorerPageData } from '@/types/hierarchy.types';
 import { LandingOverlay } from './LandingOverlay';
+import { FadeImage } from '@/components/shared/FadeImage';
 
 interface LotsSplashPageProps {
   data: ExplorerPageData;
 }
 
 export function LotsSplashPage({ data }: LotsSplashPageProps) {
-  const router = useRouter();
+  const router = useTransitionRouter();
   const { project, media, children } = data;
 
   const logos = useMemo(
@@ -26,14 +27,15 @@ export function LotsSplashPage({ data }: LotsSplashPageProps) {
   const firstChildSlug = children[0]?.slug;
 
   return (
-    <div className="relative h-screen bg-black overflow-hidden">
+    <div className="relative h-screen overflow-hidden bg-black">
       {backgroundUrl && (
-        <img
+        <FadeImage
           src={backgroundUrl}
           alt=""
           className="absolute inset-0 w-full h-full object-cover"
         />
       )}
+
       <LandingOverlay
         project={project}
         logos={logos}

@@ -46,6 +46,15 @@ export default function LayerMediaPanel({ layer, projectId, projectSlug }: Props
           currentUrl: null,
         },
         {
+          label: 'Video de la Unidad',
+          purpose: 'gallery',
+          layerField: null,
+          accept: 'video/*',
+          type: 'video',
+          storageSuffix: 'unit-video.mp4',
+          currentUrl: null,
+        },
+        {
           label: 'Background Desktop',
           purpose: 'background',
           layerField: 'background_image_url',

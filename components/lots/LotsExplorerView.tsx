@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useTransitionRouter } from 'next-view-transitions';
 import { ExplorerPageData, SiblingExplorerBundle } from '@/types/hierarchy.types';
 import { getHomeUrl, getBackUrl } from '@/lib/navigation';
 import { InteractiveSVG } from '@/components/svg/InteractiveSVG';
@@ -10,6 +10,7 @@ import { TopNav } from './TopNav';
 import { ContactModal } from './ContactModal';
 import { LocationView } from './LocationView';
 import { LotFichaOverlay } from './LotFichaOverlay';
+import { preloadImage } from '@/lib/preload';
 
 interface LotsExplorerViewProps {
   data: ExplorerPageData;
@@ -23,7 +24,7 @@ export function LotsExplorerView({
   data,
   preSelectedLotSlug,
 }: LotsExplorerViewProps) {
-  const router = useRouter();
+  const router = useTransitionRouter();
   const { project, children, media, childrenMedia } = data;
 
   const [activeView, setActiveView] = useState<ActiveView>('map');
@@ -41,6 +42,7 @@ export function LotsExplorerView({
   const [selectedLotId, setSelectedLotId] = useState<string | null>(
     preSelectedLot?.id ?? null
   );
+  const [fichaClosing, setFichaClosing] = useState(false);
 
   const selectedLot = useMemo(
     () => children.find((c) => c.id === selectedLotId) ?? null,
@@ -76,17 +78,29 @@ export function LotsExplorerView({
             `/p/${project.slug}/${data.currentPath.join('/')}/${child.slug}`
           );
         },
+        onHover: () => {
+          const cm = childrenMedia[child.id];
+          if (cm) {
+            for (const m of cm) {
+              if (m.type === 'image' && m.url) preloadImage(m.url);
+            }
+          }
+        },
       })),
-    [children, project.slug, data.currentPath]
+    [children, project.slug, data.currentPath, childrenMedia]
   );
 
   const handleCloseFicha = useCallback(() => {
-    setSelectedLotId(null);
-    history.pushState(
-      null,
-      '',
-      `/p/${project.slug}/${data.currentPath.join('/')}`
-    );
+    setFichaClosing(true);
+    setTimeout(() => {
+      setSelectedLotId(null);
+      setFichaClosing(false);
+      history.pushState(
+        null,
+        '',
+        `/p/${project.slug}/${data.currentPath.join('/')}`
+      );
+    }, 300);
   }, [project.slug, data.currentPath]);
 
   const homeUrl = getHomeUrl(data);
@@ -110,9 +124,17 @@ export function LotsExplorerView({
   const activeSection = activeView === 'location' ? 'location' as const : 'map' as const;
 
   return (
-    <div className="relative h-screen bg-black overflow-hidden">
+    <div className="relative h-screen overflow-hidden bg-black">
       {/* Content */}
       <div className="absolute inset-0 portrait:scale-[1.3] landscape:scale-[1.15] xl:scale-100">
+        {/* Standalone background — shows instantly from preloader cache */}
+        {activeView === 'map' && backgroundUrl && (
+          <img
+            src={backgroundUrl}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
         {activeView === 'map' && svgUrl && (
           <InteractiveSVG
             svgUrl={svgUrl}
@@ -144,15 +166,17 @@ export function LotsExplorerView({
 
       {/* Lot ficha overlay */}
       {selectedLot && (
-        <LotFichaOverlay
-          lot={selectedLot}
-          media={childrenMedia[selectedLot.id] ?? []}
-          project={project}
-          logos={logos}
-          onClose={handleCloseFicha}
-          onNavigate={handleNavigate}
-          onContactOpen={() => setContactOpen(true)}
-        />
+        <div className={`fixed inset-0 z-50 transition-opacity duration-300 ${fichaClosing ? 'opacity-0' : 'opacity-100'}`}>
+          <LotFichaOverlay
+            lot={selectedLot}
+            media={childrenMedia[selectedLot.id] ?? []}
+            project={project}
+            logos={logos}
+            onClose={handleCloseFicha}
+            onNavigate={handleNavigate}
+            onContactOpen={() => setContactOpen(true)}
+          />
+        </div>
       )}
 
       {/* Contact modal */}
@@ -162,6 +186,7 @@ export function LotsExplorerView({
         open={contactOpen}
         onClose={() => setContactOpen(false)}
       />
+
     </div>
   );
 }

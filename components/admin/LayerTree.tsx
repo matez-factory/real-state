@@ -24,6 +24,8 @@ export interface LayerNode {
   currency: string | null;
   is_corner: boolean | null;
   unit_type_id: string | null;
+  tour_embed_url: string | null;
+  video_url: string | null;
   front_length: number | null;
   depth_length: number | null;
   features: unknown[] | null;

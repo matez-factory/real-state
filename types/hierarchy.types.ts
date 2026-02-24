@@ -134,6 +134,10 @@ export interface Layer {
   floorNumber?: number;
   description?: string;
 
+  // Tour & video
+  tourEmbedUrl?: string;
+  videoUrl?: string;
+
   // Catch-all for non-typed fields
   properties: Record<string, unknown>;
 

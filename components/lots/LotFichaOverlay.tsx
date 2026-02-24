@@ -14,6 +14,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { Layer, Media, Project } from '@/types/hierarchy.types';
+import { FadeImage } from '@/components/shared/FadeImage';
 import { STATUS_LABELS } from '@/lib/constants/status';
 import { getFeatureIcon } from '@/lib/constants/feature-icons';
 
@@ -60,6 +61,7 @@ export function LotFichaOverlay({
   const mobileBackground = media.find((m) => m.purpose === 'background_mobile');
   const desktopBackground = media.find((m) => m.purpose === 'background');
 
+  const areaLabel = lot.areaUnit === 'ft2' ? 'ft²' : lot.areaUnit === 'ha' ? 'ha' : 'm²';
   const price = lot.price ?? 0;
   const dimensions = (lot.properties?.dimensions as string) ?? `${lot.frontLength}m x ${lot.depthLength}m`;
   const area = lot.area ?? 0;
@@ -102,7 +104,11 @@ export function LotFichaOverlay({
     }
   }, [onClose, onNavigate, onContactOpen, handleWhatsApp]);
 
-  const featureItems = features.slice(0, 3).map((f) => ({
+  const allFeatures = [
+    ...(lot.isCorner ? [{ icon: 'corner-down-right' as const, text: 'Esquina' }] : []),
+    ...features,
+  ];
+  const featureItems = allFeatures.slice(0, 3).map((f) => ({
     icon: getFeatureIcon(f.icon),
     text: f.text,
   }));
@@ -115,14 +121,14 @@ export function LotFichaOverlay({
       <div className="xl:hidden landscape:hidden fixed inset-0 z-50">
         {/* Background image */}
         {(mobileBackground?.url || desktopBackground?.url) && (
-          <img
+          <FadeImage
             src={mobileBackground?.url ?? desktopBackground?.url}
             alt={`Lote ${lot.label}`}
             className="absolute inset-0 w-full h-full object-cover"
           />
         )}
         {!mobileBackground?.url && !desktopBackground?.url && (
-          <div className="absolute inset-0 bg-black" />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
         )}
 
         {/* Back button */}
@@ -174,7 +180,7 @@ export function LotFichaOverlay({
                   <Grid3X3 className="w-2.5 h-2.5" />
                   <span>Superficie</span>
                 </div>
-                <span className="font-medium text-[10px]">{area} m&sup2;</span>
+                <span className="font-medium text-[10px]">{area} {areaLabel}</span>
               </div>
             </div>
 
@@ -247,14 +253,14 @@ export function LotFichaOverlay({
       {/* ==================== MOBILE LANDSCAPE ==================== */}
       <div className="xl:hidden portrait:hidden fixed inset-0 z-50 pointer-events-none">
         {(desktopBackground?.url || mobileBackground?.url) && (
-          <img
+          <FadeImage
             src={desktopBackground?.url ?? mobileBackground?.url}
             alt={`Lote ${lot.label}`}
             className="absolute inset-0 w-full h-full object-cover"
           />
         )}
         {!desktopBackground?.url && !mobileBackground?.url && (
-          <div className="absolute inset-0 bg-black" />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
         )}
 
         <button
@@ -301,7 +307,7 @@ export function LotFichaOverlay({
                   <span>Superficie</span>
                 </div>
                 <span className="font-medium text-[9px] md:text-[10px]">
-                  {area} m&sup2;
+                  {area} {areaLabel}
                 </span>
               </div>
             </div>
@@ -354,10 +360,10 @@ export function LotFichaOverlay({
       </div>
 
       {/* ==================== DESKTOP ==================== */}
-      <div className="hidden xl:block fixed inset-0 z-50 bg-black">
+      <div className="hidden xl:block fixed inset-0 z-50 bg-black/60 backdrop-blur-md">
         {/* Full background image of the lot */}
         {(desktopBackground?.url || mobileBackground?.url) && (
-          <img
+          <FadeImage
             src={desktopBackground?.url ?? mobileBackground?.url}
             alt={`Lote ${lot.label}`}
             className="absolute inset-0 w-full h-full object-cover"
@@ -419,7 +425,7 @@ export function LotFichaOverlay({
                 <Grid3X3 className="w-4 h-4" />
                 <span>Superficie</span>
               </div>
-              <span className="font-medium text-base">{area} m&sup2;</span>
+              <span className="font-medium text-base">{area} {areaLabel}</span>
             </div>
           </div>
 
@@ -471,6 +477,7 @@ export function LotFichaOverlay({
           </div>
         </div>
       </div>
+
     </>
   );
 }

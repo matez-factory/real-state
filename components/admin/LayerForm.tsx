@@ -336,6 +336,30 @@ export default function LayerForm({ projectId, parentId, layer, unitTypes = [], 
                       className={inputClass}
                     />
                   </label>
+
+                  <div className="pt-2 border-t border-gray-200">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Tour y Video</h3>
+                  </div>
+                  <label className="block">
+                    <span className="block text-sm font-medium text-gray-700 mb-1">Tour 360 URL</span>
+                    <input
+                      name="tour_embed_url"
+                      type="url"
+                      defaultValue={layer?.tour_embed_url ?? ''}
+                      className={inputClass}
+                      placeholder="https://my.matterport.com/show/?m=..."
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="block text-sm font-medium text-gray-700 mb-1">Video URL (YouTube / Vimeo)</span>
+                    <input
+                      name="video_url"
+                      type="url"
+                      defaultValue={layer?.video_url ?? ''}
+                      className={inputClass}
+                      placeholder="https://www.youtube.com/watch?v=..."
+                    />
+                  </label>
                 </>
               )}
 

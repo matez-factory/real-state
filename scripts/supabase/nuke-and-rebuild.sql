@@ -271,6 +271,10 @@ CREATE TABLE layers (
   -- Unit type ref (edificios)
   unit_type_id UUID REFERENCES unit_types(id) ON DELETE SET NULL,
 
+  -- Tour & video
+  tour_embed_url TEXT,
+  video_url TEXT,
+
   -- Info comprador
   buyer_name TEXT,
   buyer_email TEXT,
@@ -421,6 +425,8 @@ SELECT
   l.is_corner,
   l.features,
   l.unit_type_id,
+  l.tour_embed_url,
+  l.video_url,
   l.buyer_name,
   l.buyer_email,
   l.buyer_phone,

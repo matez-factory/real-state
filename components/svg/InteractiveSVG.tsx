@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { EntityStatus } from '@/types/hierarchy.types';
 import { STATUS_LABELS } from '@/lib/constants/status';
 
@@ -9,6 +9,7 @@ interface SVGEntityConfig {
   label: string;
   status: EntityStatus;
   onClick: () => void;
+  onHover?: () => void;
 }
 
 interface InteractiveSVGProps {
@@ -19,6 +20,8 @@ interface InteractiveSVGProps {
   backgroundMobileUrl?: string;
   /** 'lots' preserves original style; 'building' uses status-based colors + circular badges */
   variant?: 'lots' | 'building';
+  /** Called when the background image has finished loading */
+  onReady?: () => void;
 }
 
 // Status dot colors matching original lot-visualizer
@@ -58,10 +61,12 @@ export function InteractiveSVG({
   backgroundUrl,
   backgroundMobileUrl,
   variant = 'lots',
+  onReady,
 }: InteractiveSVGProps) {
   const isBuilding = variant === 'building';
   const containerRef = useRef<HTMLDivElement>(null);
   const listenersRef = useRef<ListenerEntry[]>([]);
+  const [visible, setVisible] = useState(false);
 
   // Resolve which SVG/background to use based on orientation
   const resolveAssets = useCallback(() => {
@@ -75,6 +80,7 @@ export function InteractiveSVG({
   }, [svgUrl, svgMobileUrl, backgroundUrl, backgroundMobileUrl]);
 
   const setupSVG = useCallback(async (container: HTMLDivElement) => {
+    setVisible(false);
     const { activeSvgUrl, activeBgUrl } = resolveAssets();
 
     const res = await fetch(activeSvgUrl);
@@ -101,6 +107,13 @@ export function InteractiveSVG({
       const viewBox = svg.getAttribute('viewBox');
       const [, , vbWidth, vbHeight] = (viewBox ?? '0 0 1920 1080').split(' ');
       const bgImage = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+      // Register load listener BEFORE setting href to avoid race with cached images
+      if (onReady) {
+        let fired = false;
+        const fire = () => { if (!fired) { fired = true; onReady(); } };
+        bgImage.addEventListener('load', fire, { once: true });
+        bgImage.addEventListener('error', fire, { once: true });
+      }
       bgImage.setAttribute('href', activeBgUrl);
       bgImage.setAttribute('x', '0');
       bgImage.setAttribute('y', '0');
@@ -108,6 +121,8 @@ export function InteractiveSVG({
       bgImage.setAttribute('height', vbHeight);
       bgImage.setAttribute('preserveAspectRatio', 'xMidYMid slice');
       svg.insertBefore(bgImage, svg.firstChild);
+    } else {
+      onReady?.();
     }
 
     // Make non-interactive SVG elements semi-transparent so background shows through
@@ -152,14 +167,19 @@ export function InteractiveSVG({
       let bgShape: SVGElement | null = null;
       let scaleGroup: SVGGElement | null = null;
 
+      let hoverFired = false;
       const onEnter = () => {
         element.style.fill = isBuilding ? STATUS_FILL_HOVER[entity.status] : 'rgba(255, 255, 255, 0.15)';
         if (bgShape) bgShape.setAttribute('fill', 'rgba(0, 0, 0, 0.85)');
         if (scaleGroup) scaleGroup.style.transform = 'scale(1.15)';
+        if (!hoverFired && entity.onHover) {
+          hoverFired = true;
+          entity.onHover();
+        }
       };
       const onLeave = () => {
         element.style.fill = isBuilding ? STATUS_FILL[entity.status] : 'transparent';
-        if (bgShape) bgShape.setAttribute('fill', 'rgba(0, 0, 0, 0.7)');
+        if (bgShape) bgShape.setAttribute('fill', 'rgba(0, 0, 0, 0.45)');
         if (scaleGroup) scaleGroup.style.transform = 'scale(1)';
       };
       const onClick = (e: Event) => {
@@ -173,7 +193,7 @@ export function InteractiveSVG({
       };
       const onBlur = () => {
         element.style.fill = isBuilding ? STATUS_FILL[entity.status] : 'transparent';
-        if (bgShape) bgShape.setAttribute('fill', 'rgba(0, 0, 0, 0.7)');
+        if (bgShape) bgShape.setAttribute('fill', 'rgba(0, 0, 0, 0.45)');
         if (scaleGroup) scaleGroup.style.transform = 'scale(1)';
       };
       const onKeyDown = (e: Event) => {
@@ -286,7 +306,11 @@ export function InteractiveSVG({
     });
 
     listenersRef.current = listeners;
-  }, [resolveAssets, entities, isBuilding]);
+
+    // Show SVG only after all status colors and labels are applied
+    // This prevents the flash of default blue SVG fills
+    setVisible(true);
+  }, [resolveAssets, entities, isBuilding, onReady]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -343,7 +367,8 @@ export function InteractiveSVG({
   return (
     <div
       ref={containerRef}
-      className="w-full h-full"
+      className="w-full h-full transition-opacity duration-300"
+      style={{ opacity: visible ? 1 : 0 }}
     />
   );
 }

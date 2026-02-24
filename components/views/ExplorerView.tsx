@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useCallback, useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useTransitionRouter } from 'next-view-transitions';
 import { ExplorerPageData, Layer, SiblingExplorerBundle } from '@/types/hierarchy.types';
 import { getHomeUrl, getBackUrl } from '@/lib/navigation';
 import { InteractiveSVG } from '@/components/svg/InteractiveSVG';
@@ -11,6 +11,8 @@ import { TopNav } from '@/components/lots/TopNav';
 import { ContactModal } from '@/components/lots/ContactModal';
 import { LocationView } from '@/components/lots/LocationView';
 import { STATUS_DOT_CLASSES } from '@/lib/constants/status';
+import { FadeImage } from '@/components/shared/FadeImage';
+import { preloadImage, preloadSvg } from '@/lib/preload';
 
 interface ExplorerViewProps {
   data: ExplorerPageData;
@@ -20,7 +22,7 @@ interface ExplorerViewProps {
 type ActiveView = 'map' | 'location';
 
 export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
-  const router = useRouter();
+  const router = useTransitionRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
 
@@ -70,6 +72,8 @@ export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
     [media]
   );
 
+  const { childrenMedia } = activeData;
+
   const entityConfigs = useMemo(
     () =>
       children.map((child) => ({
@@ -77,8 +81,17 @@ export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
         label: child.label,
         status: child.status,
         onClick: () => routerRef.current.push(`${basePath}/${child.slug}`),
+        onHover: () => {
+          preloadSvg(child.svgOverlayUrl);
+          preloadImage(child.backgroundImageUrl);
+          const cm = childrenMedia?.[child.id];
+          if (cm) {
+            const bg = cm.find((m) => m.purpose === 'background' && m.type === 'image');
+            if (bg?.url) preloadImage(bg.url);
+          }
+        },
       })),
-    [children, basePath]
+    [children, basePath, childrenMedia]
   );
 
   const handleSiblingSelect = useCallback((sibling: Layer) => {
@@ -111,7 +124,7 @@ export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
   const activeSection = activeView === 'location' ? 'location' as const : 'map' as const;
 
   return (
-    <div className="relative h-screen bg-black overflow-hidden">
+    <div className="relative h-screen overflow-hidden bg-black">
       {/* Content */}
       <div className="absolute inset-0">
         {activeView === 'map' && (
@@ -124,7 +137,7 @@ export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
               <div className="relative h-full w-full portrait:w-[170vw] xl:w-full">
                 {/* Persistent background — prevents black flash during floor switches */}
                 {backgroundUrl && (
-                  <img
+                  <FadeImage
                     src={backgroundUrl}
                     alt=""
                     className="absolute inset-0 w-full h-full object-cover"
@@ -230,6 +243,7 @@ export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
         open={contactOpen}
         onClose={() => setContactOpen(false)}
       />
+
     </div>
   );
 }

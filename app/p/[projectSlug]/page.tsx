@@ -4,6 +4,8 @@ import { getProjectSlugsAdmin } from '@/lib/data/repository-admin';
 import { BuildingSplashPage } from '@/components/views/BuildingSplashPage';
 import { LotsSplashPage } from '@/components/lots/LotsSplashPage';
 
+export const revalidate = 3600;
+
 interface ProjectPageProps {
   params: Promise<{ projectSlug: string }>;
 }

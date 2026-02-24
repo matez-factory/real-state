@@ -2,7 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { slugify } from '@/lib/utils/slugify';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 // ============================================================
@@ -62,12 +62,16 @@ export async function createProject(formData: FormData) {
 
   if (error) throw new Error(`Error creating project: ${error.message}`);
 
+  invalidateProjectCache(slug);
   revalidatePath('/admin');
   redirect(`/admin/projects/${data.id}`);
 }
 
 export async function updateProject(id: string, formData: FormData) {
   const supabase = createAdminClient();
+
+  // Invalidate old slug cache before update (slug might change)
+  const oldSlug = await getProjectSlugById(id);
 
   const layerLabelsRaw = formData.get('layer_labels') as string;
   const layerLabels = layerLabelsRaw
@@ -111,6 +115,9 @@ export async function updateProject(id: string, formData: FormData) {
 
   if (error) throw new Error(`Error updating project: ${error.message}`);
 
+  const newSlug = formData.get('slug') as string;
+  if (oldSlug) invalidateProjectCache(oldSlug);
+  if (newSlug && newSlug !== oldSlug) invalidateProjectCache(newSlug);
   revalidatePath('/admin');
   revalidatePath(`/admin/projects/${id}`);
   redirect(`/admin/projects/${id}`);
@@ -142,6 +149,7 @@ export async function deleteProject(id: string) {
   const { error } = await supabase.from('projects').delete().eq('id', id);
   if (error) throw new Error(`Error deleting project: ${error.message}`);
 
+  if (project) invalidateProjectCache(project.slug);
   revalidatePath('/admin');
   redirect('/admin');
 }
@@ -238,6 +246,12 @@ export async function createLayer(formData: FormData) {
     const unitTypeId = formData.get('unit_type_id') as string;
     if (unitTypeId) insertData.unit_type_id = unitTypeId;
 
+    // Tour & video
+    const tourEmbedUrl = formData.get('tour_embed_url') as string;
+    insertData.tour_embed_url = tourEmbedUrl || null;
+    const videoUrlVal = formData.get('video_url') as string;
+    insertData.video_url = videoUrlVal || null;
+
     // Building-specific properties JSONB
     const properties: Record<string, unknown> = {};
     const orientation = formData.get('orientation') as string;
@@ -261,6 +275,8 @@ export async function createLayer(formData: FormData) {
   const { error } = await supabase.from('layers').insert(insertData);
   if (error) throw new Error(`Error creating layer: ${error.message}`);
 
+  const projectSlug = await getProjectSlugById(projectId);
+  if (projectSlug) invalidateProjectCache(projectSlug);
   revalidatePath(`/admin/projects/${projectId}/layers`);
 }
 
@@ -310,6 +326,12 @@ export async function updateLayer(id: string, formData: FormData) {
     const unitTypeId = formData.get('unit_type_id') as string;
     updateData.unit_type_id = unitTypeId || null;
 
+    // Tour & video
+    const tourEmbedUrl = formData.get('tour_embed_url') as string;
+    updateData.tour_embed_url = tourEmbedUrl || null;
+    const videoUrlVal = formData.get('video_url') as string;
+    updateData.video_url = videoUrlVal || null;
+
     // Building-specific properties JSONB
     const properties: Record<string, unknown> = {};
     const orientation = formData.get('orientation') as string;
@@ -340,6 +362,8 @@ export async function updateLayer(id: string, formData: FormData) {
   const { error } = await supabase.from('layers').update(updateData).eq('id', id);
   if (error) throw new Error(`Error updating layer: ${error.message}`);
 
+  const projectSlug = await getProjectSlugById(projectId);
+  if (projectSlug) invalidateProjectCache(projectSlug);
   revalidatePath(`/admin/projects/${projectId}/layers`);
 }
 
@@ -350,6 +374,8 @@ export async function deleteLayer(id: string, projectId: string) {
   const { error } = await supabase.from('layers').delete().eq('id', id);
   if (error) throw new Error(`Error deleting layer: ${error.message}`);
 
+  const projectSlug = await getProjectSlugById(projectId);
+  if (projectSlug) invalidateProjectCache(projectSlug);
   revalidatePath(`/admin/projects/${projectId}/layers`);
 }
 
@@ -364,6 +390,8 @@ export async function reorderLayers(layerIds: string[], projectId: string) {
   const err = results.find((r) => r.error);
   if (err?.error) throw new Error(`Error reordering: ${err.error.message}`);
 
+  const projectSlug = await getProjectSlugById(projectId);
+  if (projectSlug) invalidateProjectCache(projectSlug);
   revalidatePath(`/admin/projects/${projectId}/layers`);
 }
 
@@ -445,6 +473,8 @@ export async function importLotsFromCsv(formData: FormData) {
   const { error } = await supabase.from('layers').insert(lots);
   if (error) throw new Error(`Error importing lots: ${error.message}`);
 
+  const projectSlug = await getProjectSlugById(projectId);
+  if (projectSlug) invalidateProjectCache(projectSlug);
   revalidatePath(`/admin/projects/${projectId}/layers`);
   return { count: lots.length };
 }
@@ -472,6 +502,8 @@ export async function createUnitType(formData: FormData) {
 
   if (error) throw new Error(`Error creating unit type: ${error.message}`);
 
+  const projectSlug = await getProjectSlugById(projectId);
+  if (projectSlug) invalidateProjectCache(projectSlug);
   revalidatePath(`/admin/projects/${projectId}/unit-types`);
 }
 
@@ -496,6 +528,8 @@ export async function updateUnitType(id: string, formData: FormData) {
 
   if (error) throw new Error(`Error updating unit type: ${error.message}`);
 
+  const projectSlug = await getProjectSlugById(projectId);
+  if (projectSlug) invalidateProjectCache(projectSlug);
   revalidatePath(`/admin/projects/${projectId}/unit-types`);
 }
 
@@ -525,6 +559,8 @@ export async function deleteUnitType(id: string, projectId: string) {
   const { error } = await supabase.from('unit_types').delete().eq('id', id);
   if (error) throw new Error(`Error deleting unit type: ${error.message}`);
 
+  const projectSlug = await getProjectSlugById(projectId);
+  if (projectSlug) invalidateProjectCache(projectSlug);
   revalidatePath(`/admin/projects/${projectId}/unit-types`);
   revalidatePath(`/admin/projects/${projectId}/layers`);
 }
@@ -630,6 +666,8 @@ export async function uploadMedia(formData: FormData) {
     await supabase.from('projects').update({ secondary_logo_url: url }).eq('id', projectId);
   }
 
+  const projectSlug = await getProjectSlugById(projectId);
+  if (projectSlug) invalidateProjectCache(projectSlug);
   revalidatePath(`/admin/projects/${projectId}`);
   revalidatePath(`/admin/projects/${projectId}/layers`);
   revalidatePath(`/admin/projects/${projectId}/media`);
@@ -738,6 +776,8 @@ export async function uploadTourMedia(formData: FormData) {
 
   if (insertError) throw new Error(`Media insert error: ${insertError.message}`);
 
+  const projectSlug = await getProjectSlugById(projectId);
+  if (projectSlug) invalidateProjectCache(projectSlug);
   revalidatePath(`/admin/projects/${projectId}/tour`);
   return { url };
 }
@@ -783,6 +823,8 @@ export async function deleteMedia(id: string, projectId: string) {
   const { error } = await supabase.from('media').delete().eq('id', id);
   if (error) throw new Error(`Error deleting media: ${error.message}`);
 
+  const projectSlug = await getProjectSlugById(projectId);
+  if (projectSlug) invalidateProjectCache(projectSlug);
   revalidatePath(`/admin/projects/${projectId}`);
   revalidatePath(`/admin/projects/${projectId}/layers`);
   revalidatePath(`/admin/projects/${projectId}/media`);
@@ -812,12 +854,28 @@ export async function updateLotStatus(
   const { error } = await supabase.from('layers').update(updateData).eq('id', id);
   if (error) throw new Error(`Error updating lot status: ${error.message}`);
 
+  const projectSlug = await getProjectSlugById(projectId);
+  if (projectSlug) invalidateProjectCache(projectSlug);
   revalidatePath(`/admin/projects/${projectId}/layers`);
 }
 
 // ============================================================
 // Helpers
 // ============================================================
+
+async function getProjectSlugById(projectId: string): Promise<string | null> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from('projects')
+    .select('slug')
+    .eq('id', projectId)
+    .single();
+  return data?.slug ?? null;
+}
+
+function invalidateProjectCache(slug: string) {
+  revalidateTag(`project-data:${slug}`, { expire: 0 });
+}
 
 function parseCoordinates(formData: FormData) {
   const lat = formData.get('lat') as string;

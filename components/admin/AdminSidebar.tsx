@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FolderTree, Image, Navigation, Boxes } from 'lucide-react';
+import { LayoutDashboard, FolderTree, Image, Navigation, Boxes, LogOut } from 'lucide-react';
+import { signOut } from '@/lib/actions/auth';
 
 interface Props {
   projectId?: string;
@@ -87,6 +88,18 @@ export default function AdminSidebar({ projectId, projectName }: Props) {
           </>
         )}
       </nav>
+
+      <div className="px-2 py-3 border-t border-gray-800">
+        <form action={signOut}>
+          <button
+            type="submit"
+            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm w-full hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            <LogOut size={16} />
+            Cerrar sesión
+          </button>
+        </form>
+      </div>
     </aside>
   );
 }

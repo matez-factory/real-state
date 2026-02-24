@@ -250,3 +250,5 @@ interface SiblingExplorerBundle {
 - **Status colors**: verde (available), amarillo (reserved), rojo (sold) — definidos en `lib/constants/status.ts`
 - **Supabase clients**: `server.ts` para runtime (con cookies), `admin.ts` para build time (service role key)
 - **Botones**: `outline-none` en todos los botones interactivos para evitar el anillo de foco del browser
+
+

@@ -7,6 +7,8 @@ import { UnitPage } from '@/components/views/UnitPage';
 import { LotsHomePage } from '@/components/lots/LotsHomePage';
 import { LotsExplorerView } from '@/components/lots/LotsExplorerView';
 
+export const revalidate = 3600;
+
 interface LayerPageProps {
   params: Promise<{ projectSlug: string; layers: string[] }>;
 }
