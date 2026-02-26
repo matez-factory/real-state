@@ -71,7 +71,7 @@ export const Spin360Viewer = forwardRef<Spin360ViewerRef, Spin360ViewerProps>(fu
   const [transitionVideoUrl, setTransitionVideoUrl] = useState<string | null>(null);
   const [entranceVideoUrl, setEntranceVideoUrl] = useState<string | null>(null);
   const [entranceVideoPlaying, setEntranceVideoPlaying] = useState(false);
-  const [entranceFadingOut, setEntranceFadingOut] = useState(false);
+  const [entranceFadingOut] = useState(false);
   const [tooltip, setTooltip] = useState<{ visible: boolean; x: number; y: number }>({
     visible: false, x: 0, y: 0,
   });
@@ -594,8 +594,9 @@ export const Spin360Viewer = forwardRef<Spin360ViewerRef, Spin360ViewerProps>(fu
             controls={false}
             onPlaying={() => setEntranceVideoPlaying(true)}
             onEnded={() => {
-              setEntranceFadingOut(true);
-              setTimeout(() => onEnterBuilding?.(), 500);
+              // Navigate immediately — no fade-out, video last frame stays
+              // visible until view transition screenshot takes over
+              onEnterBuilding?.();
             }}
             className="w-full h-full"
           />

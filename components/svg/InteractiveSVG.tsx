@@ -368,7 +368,10 @@ export function InteractiveSVG({
     <div
       ref={containerRef}
       className="w-full h-full transition-opacity duration-300"
-      style={{ opacity: visible ? 1 : 0 }}
+      style={{
+        opacity: visible ? 1 : 0,
+        visibility: visible ? 'visible' : 'hidden',
+      }}
     />
   );
 }

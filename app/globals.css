@@ -24,6 +24,10 @@
   --spacing-header: 0.75rem;
 }
 
+html {
+  background: black;
+}
+
 body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -62,6 +66,9 @@ body {
 .animate-fade-in { animation: fadeIn 0.3s ease-out; }
 
 /* View Transitions — smooth crossfade between pages */
+::view-transition-image-pair(root) {
+  mix-blend-mode: plus-lighter;  /* old+new opacities add to 1 → no dip to background */
+}
 ::view-transition-old(root) {
   animation: vtFadeOut 0.3s ease-out both;
 }
@@ -70,6 +77,16 @@ body {
 }
 @keyframes vtFadeOut { to { opacity: 0; } }
 @keyframes vtFadeIn { from { opacity: 0; } }
+
+/* Instant swap: hold old screenshot for 0.4s then cut to new page.
+   step-end keeps the start value for the entire duration, then jumps to end.
+   Gives the new page time to render images before revealing it. */
+:root.vt-instant ::view-transition-old(root) {
+  animation: vtFadeOut 0.4s step-end both !important;
+}
+:root.vt-instant ::view-transition-new(root) {
+  animation: vtFadeIn 0.4s step-end both !important;
+}
 
 @keyframes hotspotPulse {
   0%, 100% { fill: rgba(255,255,255,0.1); stroke: rgba(255,255,255,0.4); }

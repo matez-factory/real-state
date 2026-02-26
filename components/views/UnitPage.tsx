@@ -21,7 +21,6 @@ import { STATUS_LABELS } from '@/lib/constants/status';
 import { TopNav } from '@/components/lots/TopNav';
 import { ContactModal } from '@/components/lots/ContactModal';
 import { LocationView } from '@/components/lots/LocationView';
-import { FadeImage } from '@/components/shared/FadeImage';
 
 interface UnitPageProps {
   data: ExplorerPageData;
@@ -60,15 +59,6 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
-  if (!currentLayer) return null;
-
-  const {
-    area, price, description, orientation, features,
-    frontLength, depthLength, bedrooms, bathrooms,
-    unitTypeName, hasBalcony, floorNumber, isCorner, areaUnit,
-    tourEmbedUrl, videoUrl,
-  } = currentLayer;
-
   const galleryImages = useMemo(() => {
     const fichaImages = media.filter(
       (m) => m.type === 'image' && (m.purpose === 'ficha_furnished' || m.purpose === 'ficha_measured')
@@ -84,9 +74,15 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
     [media]
   );
 
-  const hasVideo = !!videoUrl || uploadedVideos.length > 0;
-  const hasTour = !!tourEmbedUrl;
+  const logos = useMemo(
+    () => media.filter((m) => m.purpose === 'logo' || m.purpose === 'logo_developer'),
+    [media]
+  );
+
+  const hasVideo = !!(currentLayer?.videoUrl) || uploadedVideos.length > 0;
+  const hasTour = !!currentLayer?.tourEmbedUrl;
   const hasGallery = galleryImages.length > 0;
+
   const mediaTabs = useMemo(() => {
     const tabs: { key: 'gallery' | 'video' | 'tour'; label: string; icon: typeof Images }[] = [];
     if (hasGallery) tabs.push({ key: 'gallery', label: 'Galería', icon: Images });
@@ -94,44 +90,13 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
     if (hasTour) tabs.push({ key: 'tour', label: 'Tour 360', icon: Eye });
     return tabs;
   }, [hasGallery, hasVideo, hasTour]);
-  const showTabs = mediaTabs.length > 1;
 
-  const areaLabel = areaUnit === 'ft2' ? 'ft²' : areaUnit === 'ha' ? 'ha' : 'm²';
   const isBuilding = project.type === 'building';
   const entityPrefix = isBuilding ? 'Depto' : 'Lote';
-  const statusLabel = STATUS_LABELS[currentLayer.status]?.toUpperCase() ?? currentLayer.status;
-
-  const logos = useMemo(
-    () => media.filter((m) => m.purpose === 'logo' || m.purpose === 'logo_developer'),
-    [media]
-  );
-
-  // Building details
-  const ambientes = isBuilding
-    ? [
-      bedrooms != null ? `${bedrooms} dorm.` : '',
-      bathrooms != null ? `${bathrooms} baño${bathrooms !== 1 ? 's' : ''}` : '',
-    ].filter(Boolean).join(' / ')
-    : '';
-  const pricePerM2 = area && area > 0 && price && price > 0 ? Math.round(price / area) : null;
-  const dimensions = (frontLength || depthLength)
-    ? `${frontLength ?? ''}m × ${depthLength ?? ''}m`
-    : null;
-
-  const characteristics: string[] = [];
-  if (hasBalcony) characteristics.push('Balcón');
-  if (isCorner) characteristics.push('Esquina');
-  if (features) features.forEach(f => characteristics.push(f.text));
 
   // Navigation
   const homeUrl = getHomeUrl(data);
   const floorUrl = getBackUrl(data);
-
-  const handleNavigate = (section: 'home' | 'map' | 'location' | 'contact') => {
-    if (section === 'home') router.push(homeUrl);
-    else if (section === 'map') router.push(floorUrl);
-    else if (section === 'location') setActiveView('location');
-  };
 
   // Carousel
   const prevImage = useCallback(() => {
@@ -158,18 +123,20 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
 
   // Contact handlers
   const handleWhatsApp = useCallback(() => {
+    if (!currentLayer) return;
     const whatsapp = project.whatsapp?.replace(/\D/g, '') ?? '';
     const message = encodeURIComponent(
       `Hola, me interesa el ${entityPrefix} ${currentLayer.label} en ${project.name}. ¿Podrían darme más información?`
     );
     window.open(`https://wa.me/${whatsapp}?text=${message}`, '_blank');
-  }, [project, currentLayer.label, entityPrefix]);
+  }, [project, currentLayer, entityPrefix]);
 
   const handleEmail = useCallback(() => {
+    if (!currentLayer) return;
     const subject = encodeURIComponent(`Consulta ${entityPrefix} ${currentLayer.label} - ${project.name}`);
     const body = encodeURIComponent(`Hola, me interesa el ${entityPrefix} ${currentLayer.label}. ¿Podrían darme más información?`);
     window.open(`mailto:${project.email}?subject=${subject}&body=${body}`, '_blank');
-  }, [project, currentLayer.label, entityPrefix]);
+  }, [project, currentLayer, entityPrefix]);
 
   const handleShare = useCallback(async () => {
     await navigator.clipboard.writeText(window.location.href);
@@ -184,12 +151,49 @@ export function UnitPage({ data, floorBackgroundUrl }: UnitPageProps) {
 
   const activeSection = activeView === 'location' ? 'location' as const : 'map' as const;
 
+  if (!currentLayer) return null;
+
+  // Derived values from currentLayer (safe after null check)
+  const {
+    area, price, description, orientation, features,
+    frontLength, depthLength, bedrooms, bathrooms,
+    unitTypeName, hasBalcony, floorNumber, isCorner, areaUnit,
+    tourEmbedUrl, videoUrl,
+  } = currentLayer;
+
+  const showTabs = mediaTabs.length > 1;
+  const areaLabel = areaUnit === 'ft2' ? 'ft²' : areaUnit === 'ha' ? 'ha' : 'm²';
+  const statusLabel = STATUS_LABELS[currentLayer.status]?.toUpperCase() ?? currentLayer.status;
+
+  // Building details
+  const ambientes = isBuilding
+    ? [
+      bedrooms != null ? `${bedrooms} dorm.` : '',
+      bathrooms != null ? `${bathrooms} baño${bathrooms !== 1 ? 's' : ''}` : '',
+    ].filter(Boolean).join(' / ')
+    : '';
+  const pricePerM2 = area && area > 0 && price && price > 0 ? Math.round(price / area) : null;
+  const dimensions = (frontLength || depthLength)
+    ? `${frontLength ?? ''}m × ${depthLength ?? ''}m`
+    : null;
+
+  const characteristics: string[] = [];
+  if (hasBalcony) characteristics.push('Balcón');
+  if (isCorner) characteristics.push('Esquina');
+  if (features) features.forEach(f => characteristics.push(f.text));
+
+  const handleNavigate = (section: 'home' | 'map' | 'location' | 'contact') => {
+    if (section === 'home') router.push(homeUrl);
+    else if (section === 'map') router.push(floorUrl);
+    else if (section === 'location') setActiveView('location');
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-[#0a0a0a] overflow-hidden text-white">
       {/* Floor background image */}
       {floorBackgroundUrl && (
         <div className="fixed inset-0 pointer-events-none">
-          <FadeImage src={floorBackgroundUrl} alt="" className="w-full h-full object-cover opacity-30 blur-sm" />
+          <img src={floorBackgroundUrl} alt="" className="w-full h-full object-cover opacity-30 blur-sm" />
           <div className="absolute inset-0 bg-black/60" />
         </div>
       )}

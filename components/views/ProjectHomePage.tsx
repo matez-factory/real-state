@@ -106,7 +106,12 @@ export function ProjectHomePage({ data }: ProjectHomePageProps) {
             onViewpointChange={setCurrentViewpoint}
             onTransitionChange={handleTransitionChange}
             onEnterBuilding={() => {
-              if (mapTarget) router.push(mapTarget);
+              if (mapTarget) {
+                // Hold old screenshot for 0.4s then instant swap (no crossfade)
+                document.documentElement.classList.add('vt-instant');
+                router.push(mapTarget);
+                setTimeout(() => document.documentElement.classList.remove('vt-instant'), 2000);
+              }
             }}
             renderNavigation={({ onPrev, onNext, isTransitioning: trans }) => {
               if (trans) return null;

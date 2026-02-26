@@ -11,7 +11,6 @@ import { TopNav } from '@/components/lots/TopNav';
 import { ContactModal } from '@/components/lots/ContactModal';
 import { LocationView } from '@/components/lots/LocationView';
 import { STATUS_DOT_CLASSES } from '@/lib/constants/status';
-import { FadeImage } from '@/components/shared/FadeImage';
 import { preloadImage, preloadSvg } from '@/lib/preload';
 
 interface ExplorerViewProps {
@@ -24,15 +23,19 @@ type ActiveView = 'map' | 'location';
 export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
   const router = useTransitionRouter();
   const routerRef = useRef(router);
-  routerRef.current = router;
+  useEffect(() => { routerRef.current = router; });
 
   const [activeLayerId, setActiveLayerId] = useState(data.currentLayer?.id ?? null);
+  const [prevDataLayerId, setPrevDataLayerId] = useState(data.currentLayer?.id ?? null);
+  const incomingId = data.currentLayer?.id ?? null;
+  if (incomingId !== prevDataLayerId) {
+    setPrevDataLayerId(incomingId);
+    setActiveLayerId(incomingId);
+  }
   const [mobileSiblingsOpen, setMobileSiblingsOpen] = useState(false);
   const [activeView, setActiveView] = useState<ActiveView>('map');
   const [contactOpen, setContactOpen] = useState(false);
   const mapScrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => { setActiveLayerId(data.currentLayer?.id ?? null); }, [data]);
 
   // Preload all sibling SVGs + images into browser cache
   useEffect(() => {
@@ -135,9 +138,9 @@ export function ExplorerView({ data, siblingBundle }: ExplorerViewProps) {
               className="absolute inset-0 portrait:overflow-x-auto portrait:overflow-y-hidden landscape:overflow-hidden xl:overflow-hidden"
             >
               <div className="relative h-full w-full portrait:w-[170vw] xl:w-full">
-                {/* Persistent background — prevents black flash during floor switches */}
+                {/* Persistent background — plain <img> renders instantly from preloader cache */}
                 {backgroundUrl && (
-                  <FadeImage
+                  <img
                     src={backgroundUrl}
                     alt=""
                     className="absolute inset-0 w-full h-full object-cover"

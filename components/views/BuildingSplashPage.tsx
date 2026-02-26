@@ -3,8 +3,6 @@
 import { useTransitionRouter } from 'next-view-transitions';
 import { useState, useMemo, useCallback } from 'react';
 import { ExplorerPageData } from '@/types/hierarchy.types';
-import { VideoPlayer } from '@/components/video/VideoPlayer';
-import { FadeImage } from '@/components/shared/FadeImage';
 
 interface BuildingSplashPageProps {
   data: ExplorerPageData;
@@ -53,69 +51,70 @@ export function BuildingSplashPage({ data }: BuildingSplashPageProps) {
 
   const handleIntroEnd = useCallback(() => {
     if (firstChildSlug) {
+      // Hold old screenshot then instant swap (no crossfade)
+      document.documentElement.classList.add('vt-instant');
       router.push(`/p/${project.slug}/${firstChildSlug}`);
+      setTimeout(() => document.documentElement.classList.remove('vt-instant'), 2000);
     }
   }, [firstChildSlug, project.slug, router]);
 
   return (
     <div className="relative h-screen overflow-hidden bg-black">
       {backgroundUrl && (
-        <FadeImage
+        <img
           src={backgroundUrl}
           alt=""
           className="absolute inset-0 w-full h-full object-cover"
         />
       )}
 
-      {/* Landing overlay — hidden once intro video starts playing */}
-      {!introVisible && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/20" />
+      {/* Intro video — transparent until frames render, no bg-black wrapper */}
+      {introPlaying && introVideoUrl && (
+        <video
+          src={introVideoUrl}
+          autoPlay
+          muted
+          playsInline
+          onPlaying={() => setIntroVisible(true)}
+          onEnded={handleIntroEnd}
+          className="absolute inset-0 z-30 w-full h-full object-cover"
+        />
+      )}
 
-          <div className="relative z-10 w-[90%] max-w-[230px] xl:max-w-[320px] text-center text-white">
-            <div className="glass-panel rounded-xl px-4 py-4 xl:px-6 xl:py-6 flex flex-col items-center">
-              <h1 className="text-lg xl:text-[26px] font-medium tracking-wide mb-2 xl:mb-4 text-white">
-                {project.name}
-              </h1>
+      {/* Landing overlay — fades out when video starts playing (never unmounts during intro) */}
+      <div className={`absolute inset-0 z-40 flex items-center justify-center transition-opacity duration-700 ${
+        introVisible ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      }`}>
+        <div className="absolute inset-0 bg-black/20" />
 
-              {logos.length > 0 && (
-                <div className="flex items-center justify-center gap-4 xl:gap-6 mb-3 xl:mb-5">
-                  {logos.map((logo) => (
-                    <img
-                      key={logo.id}
-                      src={logo.url!}
-                      alt={logo.altText || ''}
-                      className="h-8 xl:h-12 w-auto"
-                    />
-                  ))}
-                </div>
-              )}
+        <div className="relative z-10 w-[90%] max-w-[230px] xl:max-w-[320px] text-center text-white">
+          <div className="glass-panel rounded-xl px-4 py-4 xl:px-6 xl:py-6 flex flex-col items-center">
+            <h1 className="text-lg xl:text-[26px] font-medium tracking-wide mb-2 xl:mb-4 text-white">
+              {project.name}
+            </h1>
 
-              <button
-                onClick={handleEnter}
-                className="w-fit px-6 py-1.5 xl:px-8 xl:py-2 bg-white/10 hover:bg-white/20 text-white font-medium text-sm xl:text-base rounded-full transition-colors duration-200 outline-none"
-              >
-                Entrar
-              </button>
-            </div>
+            {logos.length > 0 && (
+              <div className="flex items-center justify-center gap-4 xl:gap-6 mb-3 xl:mb-5">
+                {logos.map((logo) => (
+                  <img
+                    key={logo.id}
+                    src={logo.url!}
+                    alt={logo.altText || ''}
+                    className="h-8 xl:h-12 w-auto"
+                  />
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={handleEnter}
+              className="w-fit px-6 py-1.5 xl:px-8 xl:py-2 bg-white/10 hover:bg-white/20 text-white font-medium text-sm xl:text-base rounded-full transition-colors duration-200 outline-none"
+            >
+              Entrar
+            </button>
           </div>
         </div>
-      )}
-
-      {/* Intro video — starts behind (z-1), promoted above (z-50) once playing */}
-      {introPlaying && introVideoUrl && (
-        <div className="absolute inset-0" style={{ zIndex: introVisible ? 50 : 1 }}>
-          <VideoPlayer
-            src={introVideoUrl}
-            autoPlay
-            muted
-            controls={false}
-            onPlaying={() => setIntroVisible(true)}
-            onEnded={handleIntroEnd}
-            className="w-full h-full"
-          />
-        </div>
-      )}
+      </div>
     </div>
   );
 }

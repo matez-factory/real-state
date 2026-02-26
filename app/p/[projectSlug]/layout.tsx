@@ -37,6 +37,7 @@ export default async function ProjectLayout({ params, children }: Props) {
     <>
       {bgUrl && (
         <img
+          data-project-bg=""
           src={bgUrl}
           alt=""
           aria-hidden
