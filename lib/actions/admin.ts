@@ -404,35 +404,76 @@ export async function importLotsFromCsv(formData: FormData) {
 
   if (!csvFile) throw new Error('No CSV file provided');
 
-  const text = await csvFile.text();
-  const lines = text.trim().split('\n');
-  if (lines.length < 2) throw new Error('CSV must have a header + at least 1 row');
+  // Fetch current project to validate CSV and know its type/slug
+  const { data: project, error: projectError } = await supabase
+    .from('projects')
+    .select('id, slug, type')
+    .eq('id', projectId)
+    .single();
 
-  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
-
-  // Get parent depth
-  let parentDepth = -1;
-  if (parentId) {
-    const { data: parent } = await supabase
-      .from('layers')
-      .select('depth')
-      .eq('id', parentId)
-      .single();
-    if (parent) parentDepth = parent.depth;
+  if (projectError || !project) {
+    throw new Error('Proyecto no encontrado para el importador CSV');
   }
 
-  // Get current max sort_order among siblings
+  const text = await csvFile.text();
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) throw new Error('El CSV debe tener encabezado y al menos 1 fila');
+
+  // Header exactamente como el template de "CSV Carga unidades"
+  const headerValues = parseCSVLine(lines[0]).map((h) => h.trim().toLowerCase());
+  const headers = headerValues.map((h) => h.replace(/\s+/g, '_'));
+
+  // Campos esperados mínimos (permitimos extras pero estos deben existir)
+  const requiredHeaders = [
+    'project_name',
+    'zone_id',
+    'level_id',
+    'unit_name',
+    'unit_label',
+    'svg_element_id',
+    'asset_type',
+    'unit_type',
+    'status',
+    'area_m2',
+    'frente_m',
+    'fondo_m',
+    'price',
+    'currency',
+    'amb',
+    'bathrooms',
+    'orientation',
+    'corner_unit',
+    'features',
+    'description',
+    'tour_360_url',
+    'video_url',
+  ];
+
+  for (const key of requiredHeaders) {
+    if (!headers.includes(key)) {
+      throw new Error(`Falta la columna "${key}" en el encabezado del CSV`);
+    }
+  }
+
+  // Cache de layers creados para no repetir consultas
+  type CachedLayer = { id: string; depth: number };
+  const towerOrZoneCache = new Map<string, CachedLayer>();
+  const floorCache = new Map<string, CachedLayer>();
+  const unitTypeCache = new Map<string, string>(); // name → id
+
+  // Sort order base por padre inicial
   const { data: existingSiblings } = await supabase
     .from('layers')
     .select('sort_order')
     .eq('project_id', projectId)
-    .eq('parent_id', parentId)
+    .eq('parent_id', parentId || null)
     .order('sort_order', { ascending: false })
     .limit(1);
 
-  let startOrder = existingSiblings?.[0] ? existingSiblings[0].sort_order + 1 : 0;
+  let globalSortOrder = existingSiblings?.[0] ? existingSiblings[0].sort_order + 1 : 0;
 
-  const lots = [];
+  const rowsToInsert: Record<string, unknown>[] = [];
+
   for (let i = 1; i < lines.length; i++) {
     const values = parseCSVLine(lines[i]);
     if (values.length < headers.length) continue;
@@ -442,41 +483,259 @@ export async function importLotsFromCsv(formData: FormData) {
       row[h] = values[idx]?.trim() ?? '';
     });
 
-    const name = row.name || `Lote ${i}`;
-    const label = row.label || name;
+    // Segunda fila del ejemplo original son descripciones: la saltamos
+    if (i === 1 && row.project_name?.toLowerCase() === 'nombre del proyecto') {
+      continue;
+    }
 
-    lots.push({
+    // Validar que la fila pertenece a este proyecto (si viene project_name)
+    const projectNameCell = (row.project_name || '').trim();
+    if (projectNameCell && projectNameCell !== project.slug) {
+      throw new Error(
+        `La fila ${i + 1} del CSV pertenece al proyecto "${projectNameCell}" y no a "${project.slug}"`
+      );
+    }
+
+    const zoneId = (row.zone_id || '').trim();
+    const levelId = (row.level_id || '').trim();
+    const assetType = (row.asset_type || '').toLowerCase();
+
+    const isLot = assetType.includes('lote');
+
+    // ============================================================
+    // 1) Resolver/crear padres (zona/torre, piso, etc.)
+    // ============================================================
+    let parentLayerId: string | null = parentId || null;
+    let parentDepth = -1;
+
+    if (parentLayerId) {
+      const { data: parentLayer } = await supabase
+        .from('layers')
+        .select('id, depth')
+        .eq('id', parentLayerId)
+        .single();
+      if (parentLayer) {
+        parentDepth = parentLayer.depth;
+      }
+    }
+
+    // Si hay zone_id, lo usamos como primer padre bajo el parentId (o raíz si parentId es null)
+    if (zoneId) {
+      const cacheKey = `${projectId}|${parentLayerId || 'root'}|${zoneId}`;
+      let cached = towerOrZoneCache.get(cacheKey);
+
+      if (!cached) {
+        const zoneSlug = slugify(zoneId);
+        const { data: existing } = await supabase
+          .from('layers')
+          .select('id, depth')
+          .eq('project_id', projectId)
+          .eq('parent_id', parentLayerId || null)
+          .eq('slug', zoneSlug)
+          .limit(1)
+          .maybeSingle();
+
+        if (existing) {
+          cached = { id: existing.id, depth: existing.depth };
+        } else {
+          const insert = {
+            project_id: projectId,
+            parent_id: parentLayerId,
+            type: project.type === 'lots' ? 'block' : 'tower',
+            depth: parentDepth + 1,
+            sort_order: globalSortOrder++,
+            slug: zoneSlug,
+            name: zoneId,
+            label: zoneId,
+            status: 'available' as const,
+          };
+          const { data: inserted, error: insertError } = await supabase
+            .from('layers')
+            .insert(insert)
+            .select('id, depth')
+            .single();
+          if (insertError || !inserted) {
+            throw new Error(`Error creando layer padre para zone_id "${zoneId}" en fila ${i + 1}`);
+          }
+          cached = { id: inserted.id, depth: inserted.depth };
+        }
+
+        towerOrZoneCache.set(cacheKey, cached);
+      }
+
+      parentLayerId = cached.id;
+      parentDepth = cached.depth;
+    }
+
+    // Si hay level_id, creamos/obtenemos un piso debajo del padre actual
+    if (levelId) {
+      const cacheKey = `${projectId}|${parentLayerId || 'root'}|${levelId}`;
+      let cached = floorCache.get(cacheKey);
+
+      if (!cached) {
+        const levelSlug = slugify(levelId);
+        const { data: existing } = await supabase
+          .from('layers')
+          .select('id, depth')
+          .eq('project_id', projectId)
+          .eq('parent_id', parentLayerId || null)
+          .eq('slug', levelSlug)
+          .limit(1)
+          .maybeSingle();
+
+        if (existing) {
+          cached = { id: existing.id, depth: existing.depth };
+        } else {
+          const levelName = project.type === 'building' ? `Piso ${levelId}` : levelId;
+          const insert = {
+            project_id: projectId,
+            parent_id: parentLayerId,
+            type: project.type === 'building' ? 'floor' : 'zone',
+            depth: parentDepth + 1,
+            sort_order: globalSortOrder++,
+            slug: levelSlug,
+            name: levelName,
+            label: levelName,
+            status: 'available' as const,
+          };
+          const { data: inserted, error: insertError } = await supabase
+            .from('layers')
+            .insert(insert)
+            .select('id, depth')
+            .single();
+          if (insertError || !inserted) {
+            throw new Error(`Error creando layer padre para level_id "${levelId}" en fila ${i + 1}`);
+          }
+          cached = { id: inserted.id, depth: inserted.depth };
+        }
+
+        floorCache.set(cacheKey, cached);
+      }
+
+      parentLayerId = cached.id;
+      parentDepth = cached.depth;
+    }
+
+    // ============================================================
+    // 2) Resolver unit_type_id desde tabla unit_types
+    // ============================================================
+    let unitTypeId: string | null = null;
+    const unitTypeName = (row.unit_type || '').trim();
+    if (unitTypeName) {
+      const cachedId = unitTypeCache.get(unitTypeName.toLowerCase());
+      if (cachedId) {
+        unitTypeId = cachedId;
+      } else {
+        const { data: existing } = await supabase
+          .from('unit_types')
+          .select('id')
+          .eq('project_id', projectId)
+          .ilike('name', unitTypeName)
+          .limit(1)
+          .maybeSingle();
+
+        if (existing) {
+          unitTypeId = existing.id;
+        } else {
+          const { data: inserted, error: insertError } = await supabase
+            .from('unit_types')
+            .insert({
+              project_id: projectId,
+              name: unitTypeName,
+              slug: slugify(unitTypeName),
+            })
+            .select('id')
+            .single();
+          if (insertError || !inserted) {
+            throw new Error(`Error creando unit_type "${unitTypeName}" en fila ${i + 1}`);
+          }
+          unitTypeId = inserted.id;
+        }
+        unitTypeCache.set(unitTypeName.toLowerCase(), unitTypeId!);
+      }
+    }
+
+    // ============================================================
+    // 3) Crear la unidad/lote final
+    // ============================================================
+    const name = row.unit_name || `Unidad ${i}`;
+    const label = row.unit_label || name;
+    const statusRaw = (row.status || '').toLowerCase();
+    const statusMap: Record<string, 'available' | 'reserved' | 'sold' | 'not_available'> = {
+      disponible: 'available',
+      reservado: 'reserved',
+      vendido: 'sold',
+      'no disponible': 'not_available',
+      'not_available': 'not_available',
+    };
+    const status = statusMap[statusRaw] || 'available';
+
+    const featuresText = row.features || '';
+    let features: unknown[] = [];
+    if (featuresText) {
+      features = featuresText
+        .split(',')
+        .map((f) => f.trim())
+        .filter(Boolean)
+        .map((label) => ({ label }));
+    }
+
+    const isCorner = (row.corner_unit || '').toLowerCase() === 'true';
+
+    // Properties JSONB para info adicional
+    const properties: Record<string, unknown> = {};
+    if (row.amb) {
+      const ambNum = parseInt(row.amb, 10);
+      if (!Number.isNaN(ambNum)) properties.bedrooms = ambNum;
+    }
+    if (row.bathrooms) {
+      const bathsNum = parseInt(row.bathrooms, 10);
+      if (!Number.isNaN(bathsNum)) properties.bathrooms = bathsNum;
+    }
+    if (row.orientation) properties.orientation = row.orientation;
+    if (row.description) properties.description = row.description;
+    if (row.unit_type) properties.unit_type = row.unit_type;
+
+    const areaVal = row.area_m2 ? parseFloat(row.area_m2) : null;
+    const frontVal = row.frente_m ? parseFloat(row.frente_m) : null;
+    const depthVal = row.fondo_m ? parseFloat(row.fondo_m) : null;
+    const priceVal = row.price ? parseFloat(row.price) : null;
+
+    rowsToInsert.push({
       project_id: projectId,
-      parent_id: parentId,
-      type: 'lot' as const,
+      parent_id: parentLayerId,
+      type: isLot ? 'lot' : 'unit',
       depth: parentDepth + 1,
-      sort_order: startOrder++,
+      sort_order: globalSortOrder++,
       slug: slugify(label),
       name,
       label,
       svg_element_id: row.svg_element_id || null,
-      status: (row.status as 'available' | 'reserved' | 'sold' | 'not_available') || 'available',
-      area: row.area ? parseFloat(row.area) : null,
+      status,
+      area: areaVal,
       area_unit: 'm2',
-      front_length: row.front_length ? parseFloat(row.front_length) : null,
-      depth_length: row.depth_length ? parseFloat(row.depth_length) : null,
-      price: row.price ? parseFloat(row.price) : null,
-      currency: (row.currency || 'USD') as 'USD' | 'ARS' | 'MXN',
-      is_corner: row.is_corner === 'true',
-      features: [] as unknown[],
-      properties: row.dimensions ? { dimensions: row.dimensions } : {},
+      front_length: frontVal,
+      depth_length: depthVal,
+      price: priceVal,
+      currency: ((row.currency as string) || 'USD') as 'USD' | 'ARS' | 'MXN',
+      is_corner: isCorner,
+      features,
+      properties,
+      unit_type_id: unitTypeId,
+      tour_embed_url: row.tour_360_url || null,
+      video_url: row.video_url || null,
     });
   }
 
-  if (!lots.length) throw new Error('No valid rows found in CSV');
+  if (!rowsToInsert.length) throw new Error('No se encontraron filas válidas en el CSV');
 
-  const { error } = await supabase.from('layers').insert(lots);
-  if (error) throw new Error(`Error importing lots: ${error.message}`);
+  const { error } = await supabase.from('layers').insert(rowsToInsert);
+  if (error) throw new Error(`Error importing lots/units: ${error.message}`);
 
   const projectSlug = await getProjectSlugById(projectId);
   if (projectSlug) invalidateProjectCache(projectSlug);
   revalidatePath(`/admin/projects/${projectId}/layers`);
-  return { count: lots.length };
+  return { count: rowsToInsert.length };
 }
 
 // ============================================================

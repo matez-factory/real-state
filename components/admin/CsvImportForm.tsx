@@ -34,6 +34,18 @@ export default function CsvImportForm({ projectId, layers, onClose }: Props) {
 
   const parentOptions = flattenLayers(layers);
 
+  function parseCSVLine(line: string): string[] {
+    const result: string[] = [];
+    let current = '', inQuotes = false;
+    for (const char of line) {
+      if (char === '"') { inQuotes = !inQuotes; }
+      else if (char === ',' && !inQuotes) { result.push(current); current = ''; }
+      else { current += char; }
+    }
+    result.push(current);
+    return result;
+  }
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -46,22 +58,22 @@ export default function CsvImportForm({ projectId, layers, onClose }: Props) {
       const lines = text.trim().split('\n');
       if (lines.length < 2) return;
 
-      const h = lines[0].split(',').map((s) => s.trim());
+      const h = parseCSVLine(lines[0]).map((s) => s.trim());
       setHeaders(h);
 
-      const rows = lines.slice(1, 11).map((line) => line.split(',').map((s) => s.trim()));
+      const rows = lines.slice(1, 11).map((line) => parseCSVLine(line).map((s) => s.trim()));
       setPreview(rows);
     };
     reader.readAsText(f);
   }
 
   async function handleImport() {
-    if (!file || !parentId) return;
+    if (!file) return;
     setImporting(true);
     try {
       const formData = new FormData();
       formData.set('project_id', projectId);
-      formData.set('parent_id', parentId);
+      if (parentId) formData.set('parent_id', parentId);
       formData.set('csv_file', file);
       const res = await importLotsFromCsv(formData);
       setResult(`Importados ${res.count} lotes exitosamente.`);
@@ -92,7 +104,7 @@ export default function CsvImportForm({ projectId, layers, onClose }: Props) {
           {/* Parent selector */}
           <label className="block">
             <span className="block text-sm font-medium text-gray-700 mb-1">
-              Layer padre (destino) *
+              Layer padre (opcional — se auto-crea desde zone_id/level_id)
             </span>
             <select
               value={parentId}
@@ -129,7 +141,7 @@ export default function CsvImportForm({ projectId, layers, onClose }: Props) {
 
           {/* Format hint */}
           <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg font-mono">
-            name,label,svg_element_id,area,front_length,depth_length,price,currency,status,is_corner,dimensions
+            project_name,zone_id,level_id,unit_name,unit_label,svg_element_id,asset_type,unit_type,status,area_m2,frente_m,fondo_m,price,currency,amb,bathrooms,orientation,corner_unit,features,description,tour_360_url,video_url
           </div>
 
           {/* Preview */}
@@ -182,7 +194,7 @@ export default function CsvImportForm({ projectId, layers, onClose }: Props) {
             <button
               type="button"
               onClick={handleImport}
-              disabled={!file || !parentId || importing}
+              disabled={!file || importing}
               className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-500 font-medium disabled:opacity-50"
             >
               {importing ? (
